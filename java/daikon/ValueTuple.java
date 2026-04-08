@@ -1,7 +1,6 @@
 package daikon;
 
 import java.util.Arrays;
-import java.util.StringJoiner;
 import java.util.logging.Logger;
 import org.checkerframework.checker.initialization.qual.UnknownInitialization;
 import org.checkerframework.checker.interning.qual.Interned;
@@ -43,30 +42,25 @@ public final class ValueTuple implements Cloneable {
   // Right now there are only three meaningful values for a mod:
   /** Not modified. */
   public static final int UNMODIFIED = 0;
-
   /** Modified. */
   public static final int MODIFIED = 1;
-
   /**
    * Missing value because the expression doesn't make sense: x.a when x is null. Data trace files
    * can contain this modbit.
    */
   public static final int MISSING_NONSENSICAL = 2;
-
   /**
    * Missing value because of data flow: this.x.x isn't available from a ppt. Data trace files must
    * not contain this modbit.
    */
   public static final int MISSING_FLOW = 3;
-
   /** Maximum mod bit value. Always set to 1+ last modbit value. */
   public static final int MODBIT_VALUES = 4;
-
-  /**
-   * Out of the range of MODBIT_VALUES because this won't appear in the tables; it gets converted to
-   * UNMODIFIED or MODIFIED, depending on whether this is the first sample. (Not sure whether that
-   * is the right strategy in the long term; it does let me avoid changing code in the short term.)
-   */
+  // Out of the range of MODBIT_VALUES because this won't appear in the
+  // tables; it gets converted to UNMODIFIED or MODIFIED, depending on
+  // whether this is the first sample.  (Not sure whether that is the right
+  // strategy in the long term; it does let me avoid changing code in the
+  // short term.)
   public static final int STATIC_CONSTANT = 22;
 
   // Implementation for unpacked representation.
@@ -144,7 +138,7 @@ public final class ValueTuple implements Cloneable {
   @EnsuresNonNullIf(result = false, expression = "vals[#1]")
   @Pure
   boolean isMissing(@UnknownInitialization(ValueTuple.class) ValueTuple this, int value_index) {
-    return isMissingNonsensical(value_index) || isMissingFlow(value_index);
+    return (isMissingNonsensical(value_index) || isMissingFlow(value_index));
   }
 
   // The arguments ints represent modification information.
@@ -197,7 +191,6 @@ public final class ValueTuple implements Cloneable {
   public static final int MODIFIED_BITVAL = MathPlume.pow(2, MODIFIED);
   public static final int MISSING_NONSENSICAL_BITVAL = MathPlume.pow(2, MISSING_NONSENSICAL);
   public static final int MISSING_FLOW_BITVAL = MathPlume.pow(2, MISSING_FLOW);
-
   // Various slices of the 8 (=TUPLEMOD_VALUES) possible tuplemod values.
   // The arrays are filled up in a static block below.
   // (As of 1/9/2000, tuplemod_modified_not_missing is used only in
@@ -206,8 +199,7 @@ public final class ValueTuple implements Cloneable {
   public static final int[] tuplemod_modified_not_missing = new int[TUPLEMOD_VALUES / 4];
 
   static {
-    int i1 = 0;
-    int i2 = 0;
+    int i1 = 0, i2 = 0;
     for (int tm = 0; tm < TUPLEMOD_VALUES; tm++) {
       if (!tuplemodHasMissingFlow(tm) && !tuplemodHasMissingNonsensical(tm)) {
         tuplemod_not_missing[i1] = tm;
@@ -225,18 +217,10 @@ public final class ValueTuple implements Cloneable {
   static int make_tuplemod(
       boolean unmodified, boolean modified, boolean missingNonsensical, boolean missingFlow) {
     int result = 0;
-    if (unmodified) {
-      result += UNMODIFIED_BITVAL;
-    }
-    if (modified) {
-      result += MODIFIED_BITVAL;
-    }
-    if (missingNonsensical) {
-      result += MISSING_NONSENSICAL_BITVAL;
-    }
-    if (missingFlow) {
-      result += MISSING_FLOW_BITVAL;
-    }
+    if (unmodified) result += UNMODIFIED_BITVAL;
+    if (modified) result += MODIFIED_BITVAL;
+    if (missingNonsensical) result += MISSING_NONSENSICAL_BITVAL;
+    if (missingFlow) result += MISSING_FLOW_BITVAL;
     return result;
   }
 
@@ -292,7 +276,7 @@ public final class ValueTuple implements Cloneable {
   }
 
   /**
-   * Returns the value of the variable vi in this ValueTuple.
+   * Get the value of the variable vi in this ValueTuple.
    *
    * @param vi the variable whose value is to be returned
    * @return the value of the variable at this ValueTuple
@@ -303,7 +287,7 @@ public final class ValueTuple implements Cloneable {
   }
 
   /**
-   * Returns the value of the variable vi in this ValueTuple, or null if it is missing. Use of this
+   * Get the value of the variable vi in this ValueTuple, or null if it is missing. Use of this
    * method is discouraged.
    *
    * @param vi the variable whose value is to be returned
@@ -316,7 +300,7 @@ public final class ValueTuple implements Cloneable {
   }
 
   /**
-   * Returns the value at the val_index, which should not have a missing value. Note: For clients,
+   * Get the value at the val_index, which should not have a missing value. Note: For clients,
    * getValue(VarInfo) is preferred to getValue(int).
    *
    * @see #getValue(VarInfo)
@@ -329,7 +313,7 @@ public final class ValueTuple implements Cloneable {
   }
 
   /**
-   * Returns the value at the val_index, or null if it is missing. Use of this method is (doubly)
+   * Get the value at the val_index, or null if it is missing. Use of this method is (doubly)
    * discouraged.
    *
    * @see #getValue(int)
@@ -430,17 +414,7 @@ public final class ValueTuple implements Cloneable {
     return vals.length;
   }
 
-  /**
-   * Returns true if this ValueTuple is empty.
-   *
-   * @return true if this ValueTuple is empty
-   */
-  @Pure
-  public boolean isEmpty() {
-    return size() == 0;
-  }
-
-  /** Returns a new ValueTuple containing this one's first len elements. */
+  /** Return a new ValueTuple containing this one's first len elements. */
   public ValueTuple trim(int len) {
     @Nullable @Interned Object[] new_vals = ArraysPlume.subarray(vals, 0, len);
     int[] new_mods = ArraysPlume.subarray(mods, 0, len);
@@ -454,9 +428,8 @@ public final class ValueTuple implements Cloneable {
   }
 
   /**
-   * Returns the values of this tuple ("missing" is used for each missing value). If vis is
-   * non-null, the values are annotated with the VarInfo name that would be associated with the
-   * value.
+   * Return the values of this tuple ("missing" is used for each missing value). If vis is non-null,
+   * the values are annotated with the VarInfo name that would be associated with the value.
    */
   @SideEffectFree
   public String toString(@GuardSatisfied ValueTuple this, VarInfo @Nullable [] vis) {
@@ -464,9 +437,7 @@ public final class ValueTuple implements Cloneable {
     assert vals.length == mods.length;
     assert vis == null || vals.length == vis.length;
     for (int i = 0; i < vals.length; i++) {
-      if (i > 0) {
-        sb.append("; ");
-      }
+      if (i > 0) sb.append("; ");
       if (vis != null) {
         sb.append(vis[i].name() + "=");
       }
@@ -509,11 +480,13 @@ public final class ValueTuple implements Cloneable {
   }
 
   public static String valsToString(@Nullable Object[] vals) {
-    StringJoiner sj = new StringJoiner(", ", "[", "]");
+    StringBuilder sb = new StringBuilder("[");
     for (int i = 0; i < vals.length; i++) {
-      sj.add(valToString(vals[i]));
+      if (i > 0) sb.append(", ");
+      sb.append(valToString(vals[i]));
     }
-    return sj.toString();
+    sb.append("]");
+    return sb.toString();
   }
 
   public static String valToString(@Nullable Object val) {
@@ -521,17 +494,17 @@ public final class ValueTuple implements Cloneable {
       return "null";
     }
     if (val instanceof long[]) {
-      return Arrays.toString((long[]) val);
+      return (Arrays.toString((long[]) val));
     } else if (val instanceof int[]) {
       // shouldn't reach this case -- should be long[], not int[]
-      return Arrays.toString((int[]) val);
+      return (Arrays.toString((int[]) val));
     } else {
-      return val.toString();
+      return (val.toString());
     }
   }
 
   /**
-   * Returns a new ValueTuple consisting of the elements of this one with indices listed in indices.
+   * Return a new ValueTuple consisting of the elements of this one with indices listed in indices.
    */
   public ValueTuple slice(int[] indices) {
     int new_len = indices.length;

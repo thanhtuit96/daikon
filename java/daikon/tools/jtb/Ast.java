@@ -26,7 +26,6 @@ import jtb.visitor.*;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.checker.signature.qual.BinaryName;
 import org.checkerframework.checker.signature.qual.ClassGetName;
-import org.checkerframework.checker.signature.qual.Identifier;
 import org.plumelib.reflection.Signatures;
 import org.plumelib.util.StringsPlume;
 
@@ -34,17 +33,11 @@ import org.plumelib.util.StringsPlume;
 @SuppressWarnings({"rawtypes", "nullness"}) // not generics-correct
 public class Ast {
 
-  /** Do not instantiate. */
-  private Ast() {
-    throw new Error("Do not instantiate");
-  }
-
-  /** The line separator. */
   private static final String lineSep = System.lineSeparator();
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // Visitors
-  //
+  ///////////////////////////////////////////////////////////////////////////
+  /// Visitors
+  ///
 
   // Reads an AST from the input stream, applies the visitor to the AST,
   // reformats only to insert comments, and writes the resulting AST to the
@@ -53,11 +46,11 @@ public class Ast {
       String javafilename, Node root, Writer output, AnnotateVisitor visitor) {
     root.accept(visitor);
     root.accept(new InsertCommentFormatter(visitor.addedComments));
-    try (PrintWriter writer = new PrintWriter(output, true)) {
-      for (int i = 0; i < visitor.javaFileLines.size(); i++) {
-        writer.println(visitor.javaFileLines.get(i));
-      }
+    PrintWriter writer = new PrintWriter(output, true);
+    for (int i = 0; i < visitor.javaFileLines.size(); i++) {
+      writer.println(visitor.javaFileLines.get(i));
     }
+    writer.close();
 
     // root.accept(new TreeDumper(output));
   }
@@ -82,9 +75,9 @@ public class Ast {
     root.accept(new TreeDumper(output));
   }
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // Printing and parsing
-  //
+  ///////////////////////////////////////////////////////////////////////////
+  /// Printing and parsing
+  ///
 
   // Formats an AST as a String.
   // This version does not reformat the tree (which blows away formatting
@@ -112,7 +105,7 @@ public class Ast {
   }
 
   /**
-   * This method translates a line like.
+   * This method translates a line like
    *
    * <pre>{@code
    * a statement; // a comment
@@ -146,19 +139,25 @@ public class Ast {
   // Formats the line enclosing a node
   public static String formatCurrentLine(Node n) {
     Node current = n;
-    while (current.getParent() != null && format(current.getParent()).indexOf(lineSep) < 0) {
+    while (current.getParent() != null && print(current.getParent()).indexOf(lineSep) < 0) {
       current = current.getParent();
     }
-    return format(current);
+    return print(current);
   }
 
-  /**
-   * Creates an AST from a String.
-   *
-   * @param type the type of the result
-   * @param stringRep the string to parse
-   * @return an AST created from the string
-   */
+  /** @deprecated Use format(Node) instead */
+  @Deprecated
+  public static String print(Node n) {
+    return format(n);
+  }
+
+  /** @deprecated Use formatCurrentLine(Node) instead */
+  @Deprecated
+  public static String printCurrentLine(Node n) {
+    return formatCurrentLine(n);
+  }
+
+  // Creates an AST from a String
   public static Node create(String type, String stringRep) {
     return create(type, new Class<?>[] {}, new Object[] {}, stringRep);
   }
@@ -178,30 +177,17 @@ public class Ast {
     return n;
   }
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // Names (fully qualified and otherwise)
-  //
+  ///////////////////////////////////////////////////////////////////////////
+  /// Names (fully qualified and otherwise)
+  ///
 
-  /**
-   * Returns true if the string is an access modifier: "public, "protected", or "private".
-   *
-   * @param s a string
-   * @return true if the string is an access modifier
-   */
   public static boolean isAccessModifier(String s) {
-    return s.equals("public") || s.equals("protected") || s.equals("private");
+    return (s.equals("public") || s.equals("protected") || s.equals("private"));
   }
 
-  /**
-   * Returns the name of the formal parameter.
-   *
-   * @param p a formal parameter
-   * @return the name of the formal parameter
-   */
   // f4 -> VariableDeclaratorId()
-  @SuppressWarnings("signature:return") // string manipulation
-  public static @Identifier String getName(FormalParameter p) {
-    String name = format(p.f4);
+  public static String getName(FormalParameter p) {
+    String name = print(p.f4);
     int startBrackets = name.indexOf('[');
     if (startBrackets == -1) {
       return name;
@@ -221,10 +207,10 @@ public class Ast {
 
     p.accept(new TreeFormatter());
 
-    String type = format(p.f2);
-    String name = format(p.f4);
+    String type = print(p.f2);
+    String name = print(p.f4);
 
-    // format() removes whitespace around brackets, so this test is safe.
+    // print() removes whitespace around brackets, so this test is safe.
     while (name.endsWith("[]")) {
       type += "[]";
       name = name.substring(0, name.length() - 2);
@@ -233,27 +219,13 @@ public class Ast {
     return type;
   }
 
-  /**
-   * Returns the name of the method.
-   *
-   * @param m a method
-   * @return the name of the method
-   */
   // f2 -> MethodDeclarator()
-  @SuppressWarnings("signature:return") // JTB is not annotated
-  public static @Identifier String getName(MethodDeclaration m) {
+  public static String getName(MethodDeclaration m) {
     return m.f2.f0.tokenImage;
   }
 
-  /**
-   * Returns the name of the constructor.
-   *
-   * @param m a constructor
-   * @return the name of the constructor
-   */
   // f1 -> <IDENTIFIER>
-  @SuppressWarnings("signature:return") // JTB is not annotated
-  public static @Identifier String getName(ConstructorDeclaration m) {
+  public static String getName(ConstructorDeclaration m) {
     return m.f1.tokenImage;
   }
 
@@ -263,7 +235,7 @@ public class Ast {
     NodeOptional o = u.f0;
     if (o.present()) {
       PackageDeclaration p = (PackageDeclaration) o.node;
-      return format(p.f2); // f2 -> Name()
+      return print(p.f2); // f2 -> Name()
     } else {
       return null;
     }
@@ -315,7 +287,7 @@ public class Ast {
     }
   }
 
-  /** Returns the fully qualified name of the class containing the node. */
+  /** Return the fully qualified name of the class containing the node. */
   public static @BinaryName String getClassName(Node d) {
 
     ClassOrInterfaceDeclaration n =
@@ -477,9 +449,9 @@ public class Ast {
     }
   }
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // Comments
-  //
+  ///////////////////////////////////////////////////////////////////////////
+  /// Comments
+  ///
 
   // Add the comment to the first regular token in the tree, after all
   // other special tokens (comments) associated with that token.
@@ -517,7 +489,7 @@ public class Ast {
       private final NodeToken comment;
       private final boolean first;
 
-      AddCommentVisitor(NodeToken comment, boolean first) {
+      public AddCommentVisitor(NodeToken comment, boolean first) {
         this.comment = comment;
         this.first = first;
       }
@@ -578,7 +550,7 @@ public class Ast {
       private final NodeToken comment;
       private final boolean first;
 
-      AddCommentVisitor(NodeToken comment, boolean first) {
+      public AddCommentVisitor(NodeToken comment, boolean first) {
         this.comment = comment;
         this.first = first;
       }
@@ -641,7 +613,7 @@ public class Ast {
     // After the traversal, the "lastNodeToken" slot contains the
     // last NodeToken visited.
     class LastNodeTokenVisitor extends DepthFirstVisitor {
-      NodeToken lastNodeToken = null;
+      public NodeToken lastNodeToken = null;
 
       @Override
       public void visit(NodeToken node) {
@@ -653,10 +625,10 @@ public class Ast {
     // descendant of the token from whcih traversal starts.)
     class NextNodeTokenVisitor extends DepthFirstVisitor {
       private boolean seenPredecessor = false;
-      NodeToken nextNodeToken;
+      public NodeToken nextNodeToken;
       private final NodeToken predecessor;
 
-      NextNodeTokenVisitor(NodeToken predecessor) {
+      public NextNodeTokenVisitor(NodeToken predecessor) {
         this.predecessor = predecessor;
       }
 
@@ -716,9 +688,9 @@ public class Ast {
     m.accept(new RemoveAnnotationsVisitor());
   }
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // Whitespace
-  //
+  ///////////////////////////////////////////////////////////////////////////
+  /// Whitespace
+  ///
 
   /**
    * Removes whitespace around punctuation: ., (, ), [, ].
@@ -736,20 +708,14 @@ public class Ast {
     return arg;
   }
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // PptMap manipulation
-  //
+  ///////////////////////////////////////////////////////////////////////////
+  /// PptMap manipulation
+  ///
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // Reflection
-  //
+  ///////////////////////////////////////////////////////////////////////////
+  /// Reflection
+  ///
 
-  /**
-   * Returns the class corresponding to the given node.
-   *
-   * @param n a node
-   * @return the class corresponding to the given node
-   */
   public static Class<?> getClass(Node n) {
     String ast_classname = getClassName(n);
     if (ast_classname.indexOf("$inner") != -1) {
@@ -946,9 +912,9 @@ public class Ast {
     return false;
   }
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // Etc.
-  //
+  ///////////////////////////////////////////////////////////////////////////
+  /// Etc.
+  ///
 
   // Following the chain of parent pointers from the child, returns
   // the first node of the specified type or a subtype.  Returns null
@@ -1028,10 +994,10 @@ public class Ast {
   // returns true if, for some node in the tree, node.tokenImage.equals(s)
   public static boolean contains(Node n, String s) {
     class ContainsVisitor extends DepthFirstVisitor {
-      boolean found = false;
+      public boolean found = false;
       private final String s;
 
-      ContainsVisitor(String s) {
+      public ContainsVisitor(String s) {
         this.s = s;
       }
 
@@ -1052,17 +1018,17 @@ public class Ast {
 
   // Returns the body of a method, including the leading "{" and trailing "}"
   public static String getBody(MethodDeclaration m) {
-    return format(m.f4.choice);
+    return print(m.f4.choice);
   }
 
   public static String getReturnType(MethodDeclaration m) {
     Node n = m.f1.f0.choice;
-    return format(n);
+    return print(n);
   }
 
   public static String getMethodDeclarator(MethodDeclaration m) {
     MethodDeclarator d = m.f2;
-    return format(d);
+    return print(d);
   }
 
   // Returns the parameters of the method, as a list of
@@ -1070,7 +1036,7 @@ public class Ast {
   // parameters.
   public static List<FormalParameter> getParameters(MethodDeclaration m) {
     class GetParametersVisitor extends DepthFirstVisitor {
-      List<FormalParameter> parameters = new ArrayList<>();
+      public List<FormalParameter> parameters = new ArrayList<>();
 
       @Override
       public void visit(FormalParameter p) {
@@ -1088,7 +1054,7 @@ public class Ast {
   // inner classes.
   public static List<FormalParameter> getParametersNoImplicit(ConstructorDeclaration cd) {
     class GetParametersVisitor extends DepthFirstVisitor {
-      List<FormalParameter> parameters = new ArrayList<>();
+      public List<FormalParameter> parameters = new ArrayList<>();
 
       @Override
       public void visit(FormalParameter p) {
@@ -1106,7 +1072,7 @@ public class Ast {
   // parameters.
   public static List<FormalParameter> getParameters(ConstructorDeclaration cd) {
     class GetParametersVisitor extends DepthFirstVisitor {
-      List<FormalParameter> parameters = new ArrayList<>();
+      public List<FormalParameter> parameters = new ArrayList<>();
 
       @Override
       public void visit(FormalParameter p) {
@@ -1174,7 +1140,7 @@ public class Ast {
   public static Set<String> getVariableNames(Node expr) {
 
     class GetSymbolNamesVisitor extends DepthFirstVisitor {
-      Set<String> symbolNames = new HashSet<>();
+      public Set<String> symbolNames = new HashSet<>();
 
       @Override
       public void visit(Name n) {
@@ -1187,7 +1153,7 @@ public class Ast {
               return;
             }
           }
-          symbolNames.add(format(n));
+          symbolNames.add(print(n));
         }
       }
     }
@@ -1220,7 +1186,7 @@ public class Ast {
     return false;
   }
 
-  /** Returns true if this is the main method for this class. */
+  /** Return true if this is the main method for this class. */
   public static boolean isMain(MethodDeclaration md) {
     if (Ast.getName(md).equals("main")) {
       List<FormalParameter> params = Ast.getParameters(md);
@@ -1253,7 +1219,7 @@ public class Ast {
     // probably not a bottleneck anyway.
     List<Invariant> invs_vector = new ArrayList<>(ppt.getInvariants());
 
-    Invariant[] invs_array = invs_vector.toArray(new Invariant[0]);
+    Invariant[] invs_array = invs_vector.toArray(new Invariant[invs_vector.size()]);
     Arrays.sort(invs_array, PptTopLevel.icfp);
 
     Global.non_falsified_invariants += invs_array.length;
@@ -1360,7 +1326,7 @@ public class Ast {
   public static boolean isInAnonymousClass(Node node) {
     ClassOrInterfaceBody clsbody =
         (ClassOrInterfaceBody) Ast.getParent(ClassOrInterfaceBody.class, node);
-    return !(clsbody.getParent() instanceof ClassOrInterfaceDeclaration);
+    return (!(clsbody.getParent() instanceof ClassOrInterfaceDeclaration));
   }
 
   public static boolean isInterface(ClassOrInterfaceBody n) {
@@ -1429,7 +1395,7 @@ public class Ast {
     if (c.isPrimitive()) {
       return c.getName();
     } else if (c.isArray()) {
-      return Signatures.classGetNameToBinaryName(c.getName());
+      return Signatures.fieldDescriptorToBinaryName(c.getName());
     } else {
       return c.getName();
     }

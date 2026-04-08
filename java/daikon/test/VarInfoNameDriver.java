@@ -1,7 +1,6 @@
 package daikon.test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.logging.Level.INFO;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -26,18 +25,9 @@ import java.util.StringTokenizer;
 @SuppressWarnings("nullness") // testing code
 public class VarInfoNameDriver {
 
-  /** Do not instantiate. */
-  private VarInfoNameDriver() {
-    throw new Error("Do not instantiate");
-  }
-
-  /**
-   * Convenience entry point for TraceSelect.
-   *
-   * @param args command-line arguments
-   */
+  // for convenience
   public static void main(String[] args) {
-    daikon.LogHelper.setupLogs(INFO);
+    daikon.LogHelper.setupLogs(daikon.LogHelper.INFO);
     run(System.in, System.out);
   }
 
@@ -70,7 +60,7 @@ public class VarInfoNameDriver {
       }
 
       // ignore blank lines
-      if (list.isEmpty()) {
+      if (list.size() == 0) {
         continue;
       }
 
@@ -78,7 +68,7 @@ public class VarInfoNameDriver {
 
       // call the handler
       String method = list.removeFirst();
-      String[] args = list.toArray(new String[0]);
+      String[] args = list.toArray(new String[list.size()]);
       Handler handler = handlers.get(method);
       if (handler == null) {
         throw new UnsupportedOperationException("Unknown method: " + method);

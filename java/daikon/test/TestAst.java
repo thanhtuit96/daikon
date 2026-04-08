@@ -4,9 +4,7 @@ import static org.junit.Assert.assertEquals;
 
 import daikon.PptName;
 import daikon.tools.jtb.*;
-import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import jtb.*;
@@ -75,22 +73,19 @@ public final class TestAst {
   @Test
   public void test_Ast_Ppt_Match() {
 
+    // Parse the file "GenericTestClass.java" (under same dir as this class)
+    InputStream sourceIn = this.getClass().getResourceAsStream("GenericTestClass.java");
+    if (sourceIn == null) {
+      throw new Error("Couldn't find file GenericTestClass.java");
+    }
+    JavaParser parser = new JavaParser(sourceIn);
+
     CompilationUnit compilationUnit;
 
-    // Parse the file "GenericTestClass.java" (under same dir as this class)
-    try (InputStream sourceIn = this.getClass().getResourceAsStream("GenericTestClass.java")) {
-      if (sourceIn == null) {
-        throw new Error("Couldn't find file GenericTestClass.java");
-      }
-      JavaParser parser = new JavaParser(sourceIn);
-
-      try {
-        compilationUnit = parser.CompilationUnit();
-      } catch (ParseException e) {
-        throw new Error(e);
-      }
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
+    try {
+      compilationUnit = parser.CompilationUnit();
+    } catch (ParseException e) {
+      throw new Error(e);
     }
 
     // Test class declarations

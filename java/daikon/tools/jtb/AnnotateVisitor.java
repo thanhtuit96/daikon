@@ -2,12 +2,7 @@
 
 package daikon.tools.jtb;
 
-import daikon.Daikon;
-import daikon.PptMap;
-import daikon.PptSlice1;
-import daikon.PptTopLevel;
-import daikon.PrintInvariants;
-import daikon.VarInfo;
+import daikon.*;
 import daikon.chicory.DaikonVariableInfo;
 import daikon.inv.Invariant;
 import daikon.inv.OutputFormat;
@@ -17,7 +12,6 @@ import daikon.inv.unary.stringsequence.OneOfStringSequence;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.io.UncheckedIOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -67,18 +61,15 @@ public class AnnotateVisitor extends DepthFirstVisitor {
   public List<String> javaFileLines;
 
   public PptMap ppts;
-
   /** if true, use "//" comments; if false, use "/*" comments. */
   public boolean slashslash;
-
   /** If true, insert annotations not supported by ESC. */
   public boolean insert_inexpressible;
-
   /** If false, use full JML specs; if true, use lightweight ESC specs. */
   public boolean lightweight;
 
   /**
-   * If true, use reflection when trying to figure out if a method overrides/implements another
+   * Whether to use reflection when trying to figure out if a method overrides/implements another
    * method. If this variable is set to false, then Annotate will not try to determine if a method
    * overrides/implements another method, which means that it will not try to add "also" tags to its
    * output.
@@ -111,12 +102,12 @@ public class AnnotateVisitor extends DepthFirstVisitor {
 
     // Read the Java file into a list of Strings.
     this.javaFileLines = new ArrayList<String>();
-    try (EntryReader er = new EntryReader(javafilename)) {
-      for (String line : er) {
+    try {
+      for (String line : new EntryReader(javafilename)) {
         this.javaFileLines.add(line);
       }
     } catch (IOException e) {
-      throw new UncheckedIOException("problem reading " + javafilename, e);
+      throw new Error(e);
     }
 
     this.ppts = ppts;
@@ -352,7 +343,7 @@ public class AnnotateVisitor extends DepthFirstVisitor {
       Node n;
       boolean behaviorInserted;
 
-      InsertBehaviorVisitor(Node n) {
+      public InsertBehaviorVisitor(Node n) {
         super();
         this.n = n;
         behaviorInserted = false;
@@ -679,7 +670,7 @@ public class AnnotateVisitor extends DepthFirstVisitor {
         if (insert_inexpressible) {
           addComment(n, javaLineComment("! " + inv + ";"), true);
         }
-        // continue;
+        continue;
       } else {
         String commentContents =
             (Daikon.output_format == OutputFormat.DBCJAVA ? "  " : "@ ")
@@ -804,9 +795,9 @@ public class AnnotateVisitor extends DepthFirstVisitor {
     }
   }
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // Subroutines
-  //
+  ///////////////////////////////////////////////////////////////////////////
+  /// Subroutines
+  ///
 
   /** The argument should already contain "@" or any other leading characters. */
   String javaLineComment(String comment) {
@@ -880,15 +871,9 @@ public class AnnotateVisitor extends DepthFirstVisitor {
     return result;
   }
 
-  /**
-   * Returns a HashMap for fields with ".elementType == \type(...)" invariants, mapping the field to
-   * the type of its array elements.
-   *
-   * @param ppt an :::OBJECT or :::CLASS program point
-   * @param allFieldNames all field names
-   * @return a map from field names whose types are arrays, to the element type of those arrays
-   */
-  @SuppressWarnings("NonApiType") // JTB uses HashMap, so this JTB utility does too
+  // Returns a HashMap for fields with ".elementType == \type(...)" invariants,
+  // mapping the field to the type.
+  // ppt is an :::OBJECT or :::CLASS program point.
   HashMap<String, String> element_type_fields(PptTopLevel ppt, List<String> allFieldNames) {
     // System.out.println("element_type_fields(" + ppt + ")");
     HashMap<String, String> result = new HashMap<>();
@@ -1005,11 +990,10 @@ public class AnnotateVisitor extends DepthFirstVisitor {
   }
 
   private static class InvariantsAndModifiedVars {
-    final List<Invariant> invariants;
-    // `modifiedVars` cannot be final.
-    String modifiedVars;
+    public List<Invariant> invariants;
+    public String modifiedVars;
 
-    InvariantsAndModifiedVars(List<Invariant> invariants, String modifiedVars) {
+    public InvariantsAndModifiedVars(List<Invariant> invariants, String modifiedVars) {
       this.invariants = invariants;
       this.modifiedVars = modifiedVars;
     }
@@ -1063,7 +1047,7 @@ public class AnnotateVisitor extends DepthFirstVisitor {
     return index;
   }
 
-  /** Returns the whitespace at the front of the string. */
+  /** Return the whitespace at the front of the string. */
   public static String precedingWhitespace(String s) {
     for (int i = 0; i < s.length(); i++) {
       if (!Character.isWhitespace(s.charAt(i))) {

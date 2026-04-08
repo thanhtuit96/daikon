@@ -5,7 +5,6 @@ package daikon.tools;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.io.UncheckedIOException;
 import java.util.StringTokenizer;
 import org.plumelib.util.FilesPlume;
 import org.plumelib.util.StringsPlume;
@@ -21,11 +20,6 @@ import org.plumelib.util.StringsPlume;
  * remaining nonces and repeat. This should only require one pass through the file.
  */
 public class DtraceNonceFixer {
-
-  /** Do not instantiate. */
-  private DtraceNonceFixer() {
-    throw new Error("Do not instantiate");
-  }
 
   /** The system-specific line separator. */
   private static final String lineSep = System.lineSeparator();
@@ -60,8 +54,9 @@ public class DtraceNonceFixer {
     String outputFilename =
         args[0].endsWith(".gz") ? (args[0] + "_fixed.gz") : (args[0] + "_fixed");
 
-    try (BufferedReader br1 = FilesPlume.newBufferedFileReader(args[0]);
-        PrintWriter out1 = new PrintWriter(FilesPlume.newBufferedFileWriter(outputFilename))) {
+    try {
+      BufferedReader br1 = FilesPlume.newBufferedFileReader(args[0]);
+      PrintWriter out = new PrintWriter(FilesPlume.newBufferedFileWriter(outputFilename));
 
       // maxNonce - the biggest nonce ever found in the file
       // correctionFactor - the amount to add to each observed nonce
@@ -84,36 +79,37 @@ public class DtraceNonceFixer {
         int newNonce = non + correctionFactor;
         maxNonce = Math.max(maxNonce, newNonce);
         if (non != -1) {
-          out1.println(spawnWithNewNonce(nextInvo, newNonce));
+          out.println(spawnWithNewNonce(nextInvo, newNonce));
         } else {
-          out1.println(nextInvo);
+          out.println(nextInvo);
         }
       }
-      out1.flush();
+      out.flush();
+      out.close();
 
       // now go back and add the OBJECT and CLASS invocations
       String allFixedFilename =
           outputFilename.endsWith(".gz") ? (args[0] + "_all_fixed.gz") : (args[0] + "_all_fixed");
 
-      try (BufferedReader br2 = FilesPlume.newBufferedFileReader(outputFilename);
-          PrintWriter out2 = new PrintWriter(FilesPlume.newBufferedFileWriter(allFixedFilename))) {
+      BufferedReader br2 = FilesPlume.newBufferedFileReader(outputFilename);
+      out = new PrintWriter(FilesPlume.newBufferedFileWriter(allFixedFilename));
 
-        while (br2.ready()) {
-          String nextInvo = grabNextInvocation(br2);
-          int non = peekNonce(nextInvo);
-          // if there is no nonce at this point it must be an OBJECT
-          // or a CLASS invocation
-          if (non == -1) {
-            out2.println(spawnWithNewNonce(nextInvo, ++maxNonce));
-          } else {
-            out2.println(nextInvo);
-          }
+      while (br2.ready()) {
+        String nextInvo = grabNextInvocation(br2);
+        int non = peekNonce(nextInvo);
+        // if there is no nonce at this point it must be an OBJECT
+        // or a CLASS invocation
+        if (non == -1) {
+          out.println(spawnWithNewNonce(nextInvo, ++maxNonce));
+        } else {
+          out.println(nextInvo);
         }
-
-        out2.flush();
       }
+
+      out.flush();
+      out.close();
     } catch (IOException e) {
-      throw new UncheckedIOException(e);
+      throw new Error(e);
     }
   }
 

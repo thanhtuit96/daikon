@@ -108,10 +108,8 @@ public class PureMethodInfo extends DaikonVariableInfo {
   }
 
   /**
-   * Returns the current values of this pure method's arguments based on {@code parentVal}.
-   *
-   * @param parentVal the parent of the current method
-   * @return an Object the values of this method's arguments
+   * Returns an array corresponding to the current values of this pure method's arguments based on
+   * the given parentVal.
    */
   private @Nullable Object[] getArgVals(Object parentVal) {
     @Nullable Object[] params = new @Nullable Object[args.length];
@@ -130,15 +128,6 @@ public class PureMethodInfo extends DaikonVariableInfo {
     return params;
   }
 
-  /**
-   * Returns the result of invoking the method.
-   *
-   * @param meth a method
-   * @param receiverVal the receiver value
-   * @param argVals the argument values
-   * @return the result of invoking the method
-   */
-  @SuppressWarnings("LockOnNonEnclosingClassLiteral") // `synchronize on Runtime.class`
   private static @Nullable Object executePureMethod(
       Method meth, Object receiverVal, @Nullable Object[] argVals) {
     // Between startPure() and endPure(), no output is done to the trace file.
@@ -212,7 +201,7 @@ public class PureMethodInfo extends DaikonVariableInfo {
     return VarKind.FUNCTION;
   }
 
-  /** Returns the short name of the method as the relative name. */
+  /** Return the short name of the method as the relative name. */
   @Override
   public String get_relative_name() {
     return minfo.method_name;

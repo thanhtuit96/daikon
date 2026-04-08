@@ -13,7 +13,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.StringJoiner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.checkerframework.checker.initialization.qual.UnderInitialization;
@@ -34,6 +33,9 @@ import org.checkerframework.dataflow.qual.SideEffectFree;
  */
 public class PptRelation implements Serializable {
 
+  // We are Serializable, so we specify a version to allow changes to
+  // method signatures without breaking serialization.  If you add or
+  // remove fields, you should change this number to the current date.
   static final long serialVersionUID = 20030819L;
 
   /**
@@ -44,7 +46,7 @@ public class PptRelation implements Serializable {
   public enum PptRelationType {
     /** Acyclic relationship to a parent, eg, method to its object. */
     PARENT,
-    /** Possibly cyclic relationship, eg, nested object instances. */
+    /** Possibly cyclic relationship, eg. nested object instances */
     USER,
     /** Entrance of method to exit of method. */
     ENTER_EXIT,
@@ -54,9 +56,8 @@ public class PptRelation implements Serializable {
     MERGE_CHILD,
     /** Relation from a program point to its conditional ppts. */
     PPT_PPTCOND
-  }
+  };
 
-  /** The logger for daikon.PptRelation. */
   private static final Logger debug = Logger.getLogger("daikon.PptRelation");
 
   /** Description of type of parent-child relationship (debug output only). */
@@ -69,15 +70,32 @@ public class PptRelation implements Serializable {
   public PptTopLevel child;
 
   /** Map from parent vars to matching child vars. */
-  @SuppressWarnings("serial")
   public Map<VarInfo, VarInfo> parent_to_child_map;
 
   /** Map from child vars to matching parent vars. */
-  @SuppressWarnings("serial")
   public Map<VarInfo, VarInfo> child_to_parent_map;
 
   /** Boolean. Controls whether the object-user relation is created in the variable hierarchy. */
   public static boolean dkconfig_enable_object_user = false;
+
+  /**
+   * Create a relation between the specified parent and child. The actual variable relations are
+   * filled in by the caller. Note that this creates the connection between this relation and the
+   * parent/child.
+   */
+  /*
+  private PptRelation(PptTopLevel parent, PptTopLevel child, String rel_type) {
+
+    this.parent = parent;
+    this.child = child;
+    parent_to_child_map = new LinkedHashMap<>();
+    child_to_parent_map = new LinkedHashMap<>();
+    // rel_type is one of the above relationship types because this is a
+    // private constructor, called only within this file.
+    relationship = rel_type;
+    connect();
+  }
+  */
 
   /**
    * Create a relation between the specified parent and child. The actual variable relations are
@@ -111,17 +129,7 @@ public class PptRelation implements Serializable {
   /** Returns the number of parent to child variable relations. */
   @Pure
   public int size() {
-    return parent_to_child_map.size();
-  }
-
-  /**
-   * Returns true if this PptRelation is empty.
-   *
-   * @return true if this PptRelation is empty
-   */
-  @Pure
-  public boolean isEmpty() {
-    return parent_to_child_map.isEmpty();
+    return (parent_to_child_map.size());
   }
 
   @SideEffectFree
@@ -130,12 +138,14 @@ public class PptRelation implements Serializable {
     return (parent.ppt_name + "->" + child.ppt_name + "(" + relationship + ")");
   }
 
-  /** Returns a string containing all of the parent&rarr;child var relations. */
+  /** Return a string containing all of the parent&rarr;child var relations. */
   public String parent_to_child_var_string() {
 
-    StringJoiner var_str = new StringJoiner(", ");
-    for (Map.Entry<VarInfo, VarInfo> entry : parent_to_child_map.entrySet()) {
-      var_str.add(entry.getKey().name() + "->" + entry.getValue().name());
+    StringBuilder var_str = new StringBuilder();
+    for (VarInfo pv : parent_to_child_map.keySet()) {
+      VarInfo cv = parent_to_child_map.get(pv);
+      if (var_str.length() > 0) var_str.append(", ");
+      var_str.append(pv.name() + "->" + cv.name());
     }
 
     return var_str.toString();
@@ -169,8 +179,8 @@ public class PptRelation implements Serializable {
   }
 
   /**
-   * Returns true if this relation is a primary relation. This used to simplify debug prints of the
-   * PPt tree (so that extra relations don't result in duplicative information).
+   * Returns whether or not this relation is a primary relation. This used to simplify debug prints
+   * of the PPt tree (so that extra relations don't result in duplicative information).
    *
    * <p>Somewhat arbitrarily, Object&rarr;User and Enter&rarr;Exit are not considered primary while
    * all others are. The remaining relations (class&rarr;object, object&rarr;method,and
@@ -178,7 +188,7 @@ public class PptRelation implements Serializable {
    */
   @Pure
   public boolean is_primary() {
-    return (relationship != PptRelationType.USER) && (relationship != PptRelationType.ENTER_EXIT);
+    return ((relationship != PptRelationType.USER) && (relationship != PptRelationType.ENTER_EXIT));
   }
 
   /** Returns a string describing the parent-child relationship. */
@@ -223,9 +233,9 @@ public class PptRelation implements Serializable {
     return parent_to_child_map.get(parentVar);
   }
 
-  /** Returns true if this relation's child has children of its own. */
+  /** Returns whether or not this relation's child has children of its own. */
   public boolean hasChildren() {
-    return !child.children.isEmpty();
+    return (child.children.size() > 0);
   }
 
   /**
@@ -267,7 +277,7 @@ public class PptRelation implements Serializable {
       Equality e = (Equality) inv;
       debug.fine("-- processing equality set " + e);
       Set<VarInfo> eqset = e.getVars();
-      VarInfo[] varr = eqset.toArray(new VarInfo[0]);
+      VarInfo[] varr = eqset.toArray(new VarInfo[eqset.size()]);
 
       // Build each combination of variables in the equality set and produce
       // a pair for each.  Skip any variables that do not have corresponding
@@ -638,15 +648,14 @@ public class PptRelation implements Serializable {
 
   // used by init_hierarchy below
   private static class SplitChild {
-    PptRelation rel;
-    PptSplitter ppt_split;
+    public PptRelation rel;
+    public PptSplitter ppt_split;
 
-    SplitChild(PptRelation rel, PptSplitter ppt_split) {
+    public SplitChild(PptRelation rel, PptSplitter ppt_split) {
       this.rel = rel;
       this.ppt_split = ppt_split;
     }
   }
-
   /**
    * Initialize the hierarchical relationship between ppts. Specifically process each ppt, find its
    * parent(s) in the partial order, and fill this point into the children field in the parent. Note
@@ -685,9 +694,7 @@ public class PptRelation implements Serializable {
             rel = newObjectMethodRel(parent, ppt);
           } else {
             parent = all_ppts.get(parent.ppt_name.makeClassStatic());
-            if (parent != null) {
-              rel = newObjectMethodRel(parent, ppt);
-            }
+            if (parent != null) rel = newObjectMethodRel(parent, ppt);
           }
         }
 
@@ -696,9 +703,7 @@ public class PptRelation implements Serializable {
         PptTopLevel parent = all_ppts.get(pname.makeExit());
         // System.out.printf("Parent of %s is %s%n", pname.name(),
         //                   parent.name());
-        if (parent != null) {
-          rel = newCombinedExitExitNNRel(parent, ppt);
-        }
+        if (parent != null) rel = newCombinedExitExitNNRel(parent, ppt);
       }
 
       // If a relation was created, connect it into its ppts
@@ -827,7 +832,7 @@ public class PptRelation implements Serializable {
       //                    ppt.ppt_name.isNumberedExitPoint());
 
       // Loop over each splitter
-      // splitter_loop:
+      splitter_loop:
       for (Iterator<PptSplitter> ii = ppt.splitters.iterator(); ii.hasNext(); ) {
         PptSplitter ppt_split = ii.next();
 
@@ -869,9 +874,7 @@ public class PptRelation implements Serializable {
     if (debug.isLoggable(Level.FINE)) {
       debug.fine("PPT Hierarchy");
       for (PptTopLevel ppt : all_ppts.pptIterable()) {
-        if (ppt.parents.isEmpty()) {
-          ppt.debug_print_tree(debug, 0, null);
-        }
+        if (ppt.parents.size() == 0) ppt.debug_print_tree(debug, 0, null);
       }
     }
 
@@ -895,7 +898,7 @@ public class PptRelation implements Serializable {
       // rels is solely for debugging; each relation is stored in the
       // parent and child ppts
       List<PptRelation> rels = new ArrayList<>();
-      Daikon.debugProgress.finer("Processing ppt " + pname);
+      Daikon.debugProgress.fine("Processing ppt " + pname);
       debug.fine("Processing ppt " + pname);
 
       assert ppt.parent_relations != null : "missing parent_relations in ppt " + ppt.name();
@@ -986,7 +989,7 @@ public class PptRelation implements Serializable {
       // System.out.printf("processing splitter %s%n", ppt.name());
 
       // Loop over each splitter
-      // splitter_loop:
+      splitter_loop:
       for (Iterator<PptSplitter> ii = ppt.splitters.iterator(); ii.hasNext(); ) {
         PptSplitter ppt_split = ii.next();
 
@@ -1029,7 +1032,7 @@ public class PptRelation implements Serializable {
     // happen when there are ppts such as OBJECT or CLASS that don't end up
     // with any children (due to the program source or because of ppt filtering).
     for (PptTopLevel ppt : all_ppts.pptIterable()) {
-      if (ppt.children.isEmpty() && (ppt.equality_view == null)) {
+      if ((ppt.children.size() == 0) && (ppt.equality_view == null)) {
         assert ppt.is_object() || ppt.is_class() || ppt.is_enter() : ppt;
         ppt.equality_view = new PptSliceEquality(ppt);
         ppt.equality_view.instantiate_invariants();
@@ -1040,9 +1043,7 @@ public class PptRelation implements Serializable {
     if (debug.isLoggable(Level.FINE)) {
       debug.fine("PPT Hierarchy");
       for (PptTopLevel ppt : all_ppts.pptIterable()) {
-        if (ppt.parents.isEmpty()) {
-          ppt.debug_print_tree(debug, 0, null);
-        }
+        if (ppt.parents.size() == 0) ppt.debug_print_tree(debug, 0, null);
       }
     }
 

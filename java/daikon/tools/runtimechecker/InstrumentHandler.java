@@ -1,12 +1,11 @@
 package daikon.tools.runtimechecker;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.logging.Level.FINE;
-import static java.util.logging.Level.INFO;
 
 import daikon.Daikon;
 import daikon.FileIO;
 import daikon.Global;
+import daikon.LogHelper;
 import daikon.PptMap;
 import daikon.tools.jtb.ParseResults;
 import gnu.getopt.Getopt;
@@ -62,7 +61,6 @@ public class InstrumentHandler extends CommandHandler {
   // Default values; can be overridden by the command-line switches above.
   /** Default directory for instrumented classes. */
   private String instrumented_directory = "instrumented-classes";
-
   /** Default directory for checker classes. */
   private String checkersOutputDirName = "checker-classes";
 
@@ -91,7 +89,7 @@ public class InstrumentHandler extends CommandHandler {
     }
 
     // Set up debug traces; note this comes after reading command line options.
-    daikon.LogHelper.setupLogs(Global.debugAll ? FINE : INFO);
+    LogHelper.setupLogs(Global.debugAll ? LogHelper.FINE : LogHelper.INFO);
 
     // Create instrumented-classes dir.
     File outputDir = new File(instrumented_directory);
@@ -137,14 +135,20 @@ public class InstrumentHandler extends CommandHandler {
       try {
 
         File instrumentedFileDir =
-            new File(outputDir.getPath(), oneFile.packageName.replace(".", File.separator));
+            new File(
+                outputDir.getPath()
+                    + File.separator
+                    + oneFile.packageName.replace(".", File.separator));
 
         if (!instrumentedFileDir.exists()) {
           instrumentedFileDir.mkdirs();
         }
 
         File checkerClassesDir =
-            new File(checkersOutputDirName, oneFile.packageName.replace(".", File.separator));
+            new File(
+                checkersOutputDirName
+                    + File.separator
+                    + oneFile.packageName.replace(".", File.separator));
 
         if (!checkerClassesDir.exists()) {
           checkerClassesDir.mkdirs();
@@ -155,25 +159,25 @@ public class InstrumentHandler extends CommandHandler {
         File instrumentedFile = new File(instrumentedFileDir, instrumentedFileName);
         debug.fine("instrumented file name: " + instrumentedFile.getPath());
         System.out.println("Writing " + instrumentedFile);
-        try (Writer output = Files.newBufferedWriter(instrumentedFile.toPath(), UTF_8)) {
-          // Bug: JTB seems to order the modifiers in a non-standard way,
-          // such as "static final public" instead of "public static final".
-          oneFile.compilationUnit.accept(new TreeFormatter());
-          TreeDumper dumper = new TreeDumper(output);
-          dumper.printSpecials(false);
-          oneFile.compilationUnit.accept(dumper);
-        }
+        Writer output = Files.newBufferedWriter(instrumentedFile.toPath(), UTF_8);
+        // Bug: JTB seems to order the modifiers in a non-standard way,
+        // such as "static final public" instead of "public static final".
+        oneFile.compilationUnit.accept(new TreeFormatter());
+        TreeDumper dumper = new TreeDumper(output);
+        dumper.printSpecials(false);
+        oneFile.compilationUnit.accept(dumper);
+
+        output.close();
 
         // Output checker classes
         for (CheckerClass cls : checkerClasses) {
           String checkerClassFileName = cls.getCheckerClassName() + ".java";
           File checkerClassFile = new File(checkerClassesDir, checkerClassFileName);
           System.out.println("Writing " + checkerClassFile);
-          try (Writer output = Files.newBufferedWriter(checkerClassFile.toPath(), UTF_8)) {
-            CompilationUnit cu = cls.getCompilationUnit();
-            cu.accept(new TreeFormatter());
-            cu.accept(new TreeDumper(output));
-          }
+          output = Files.newBufferedWriter(checkerClassFile.toPath(), UTF_8);
+          CompilationUnit cu = cls.getCompilationUnit();
+          cu.accept(new TreeFormatter());
+          cu.accept(new TreeDumper(output));
         }
 
       } catch (IOException e) {
@@ -189,10 +193,10 @@ public class InstrumentHandler extends CommandHandler {
 
   @UsesObjectEquals
   private static class Arguments {
-    String invFile;
-    List<String> javaFileNames;
+    public String invFile;
+    public List<String> javaFileNames;
 
-    Arguments(String invFile, List<String> javaFileNames) {
+    public Arguments(String invFile, List<String> javaFileNames) {
       this.invFile = invFile;
       this.javaFileNames = javaFileNames;
     }
@@ -234,7 +238,7 @@ public class InstrumentHandler extends CommandHandler {
           } else if (Daikon.debugAll_SWITCH.equals(option_name)) {
             Global.debugAll = true;
           } else if (Daikon.debug_SWITCH.equals(option_name)) {
-            daikon.LogHelper.setLevel(Daikon.getOptarg(g), FINE);
+            LogHelper.setLevel(Daikon.getOptarg(g), LogHelper.FINE);
           } else {
             System.err.println("Unknown long option received: " + option_name);
           }

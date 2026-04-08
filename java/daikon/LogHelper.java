@@ -1,7 +1,5 @@
 package daikon;
 
-import static java.util.logging.Level.INFO;
-
 import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.ConsoleHandler;
@@ -21,6 +19,12 @@ public final class LogHelper {
   private LogHelper() {
     throw new Error("do not instantiate");
   }
+
+  // Class variables so user doesn't have to use "Level." prefix.
+  public static final Level FINE = Level.FINE;
+  public static final Level INFO = Level.INFO;
+  public static final Level WARNING = Level.WARNING;
+  public static final Level SEVERE = Level.SEVERE;
 
   /**
    * Sets up global logs with a given priority and logging output pattern. Creates one

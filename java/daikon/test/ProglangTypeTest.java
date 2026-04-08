@@ -1,34 +1,26 @@
 package daikon.test;
 
-import static java.util.logging.Level.INFO;
 import static org.junit.Assert.assertEquals;
 
-import daikon.FileIO;
-import daikon.ProglangType;
+import daikon.*;
 import java.util.Arrays;
 import java.util.Comparator;
+import junit.framework.*;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.plumelib.util.ArraysPlume;
 
-/** Test the ProglangType class. */
 @SuppressWarnings("nullness") // testing code
 public class ProglangTypeTest {
 
-  /** Creates a ProglangTypeTest. */
-  public ProglangTypeTest() {}
+  static Comparator<long[]> longarrcomparator = new ArraysPlume.LongArrayComparatorLexical();
 
-  /** Comparator for arrays of longs. */
-  static Comparator<long[]> longarrcomparator = ArraysPlume.LongArrayComparatorLexical.it;
-
-  /** Comparator for arrays of Strings. */
   static Comparator<String[]> comparrcomparator =
       new ArraysPlume.ComparableArrayComparatorLexical<String>();
 
-  /** prepare for tests */
   @BeforeClass
   public static void setUpClass() {
-    daikon.LogHelper.setupLogs(INFO);
+    daikon.LogHelper.setupLogs(LogHelper.INFO);
     FileIO.new_decl_format = true;
   }
 

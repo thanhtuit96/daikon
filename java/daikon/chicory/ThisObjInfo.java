@@ -28,13 +28,15 @@ public class ThisObjInfo extends DaikonVariableInfo {
     this.type = type;
   }
 
-  // See daikon.chicory.DaikonVariableInfo#getChildValue(java.lang.Object)
+  /* (non-Javadoc)
+   * @see daikon.chicory.DaikonVariableInfo#getChildValue(java.lang.Object)
+   */
   @Override
   public @Nullable Object getMyValFromParentVal(Object val) {
     throw new Error("shouldn't be called");
   }
 
-  /** {@code this} is a top-level variable. */
+  /** 'this' is a top level variable */
   @Override
   public VarKind get_var_kind() {
     return VarKind.VARIABLE;

@@ -162,6 +162,9 @@ import typequals.prototype.qual.Prototype;
    */
 #endif
 public class CLASSNAME extends SUPERCLASS {
+  // We are Serializable, so we specify a version to allow changes to
+  // method signatures without breaking serialization.  If you add or
+  // remove fields, you should change this number to the current date.
   static final long serialVersionUID = 20030822L;
 
   // Variables starting with dkconfig_ should only be set via the
@@ -186,6 +189,7 @@ public class CLASSNAME extends SUPERCLASS {
     return proto;
   }
 
+  /** returns whether or not this invariant is enabled */
   @Override
   public boolean enabled() {
     return dkconfig_enabled;
@@ -208,6 +212,7 @@ public class CLASSNAME extends SUPERCLASS {
     return true;
   }
 
+  /** Instantiate the invariant on the specified slice. */
   @Override
   protected CLASSNAME instantiate_dyn(@Prototype CLASSNAME this, PptSlice slice) {
     return new CLASSNAME(slice);
@@ -255,7 +260,7 @@ public class CLASSNAME extends SUPERCLASS {
 #if defined(EQUAL) || defined(FLOATEQUAL)
     return var().name() + " elements are equal";
 #else
-    return var().name() + " sorted by " + COMPARATORSTRING;
+    return (var().name() + " sorted by " + COMPARATORSTRING);
 #endif
   }
 
@@ -404,7 +409,7 @@ public class CLASSNAME extends SUPERCLASS {
   @Override
   public boolean hasSeenNonSingletonSample() {
     VALUE_SET vs = (VALUE_SET) ppt.var_infos[0].get_value_set();
-    return vs.nonsingleton_arr_cnt() > 0;
+    return (vs.nonsingleton_arr_cnt() > 0);
   }
 
   @Pure

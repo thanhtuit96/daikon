@@ -1,6 +1,5 @@
 package daikon.test.diff;
 
-import static java.util.logging.Level.INFO;
 import static org.junit.Assert.assertEquals;
 
 import daikon.*;
@@ -44,10 +43,9 @@ public class DiffTester {
   private PptMap imps1;
   private PptMap imps2;
 
-  /** prepare for tests */
   @BeforeClass
   public static void setUpClass() {
-    daikon.LogHelper.setupLogs(INFO);
+    daikon.LogHelper.setupLogs(LogHelper.INFO);
     FileIO.new_decl_format = true;
   }
 
@@ -539,22 +537,13 @@ public class DiffTester {
     PrintStream ps = new PrintStream(baos);
     PrintAllVisitor v = new PrintAllVisitor(ps, false, true);
     root.accept(v);
-    @SuppressWarnings("DefaultCharset") // toString(Charset) was introduced in Java 10
-    String result = baos.toString();
-    return result;
+    return baos.toString();
   }
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // Helper functions
-  //
+  ///////////////////////////////////////////////////////////////////////////
+  /// Helper functions
+  ///
 
-  /**
-   * Creates a PptTopLevel for the given name and variables.
-   *
-   * @param pptname the program point name
-   * @param vars the variables
-   * @return a PptTopLevel for the given name and variables
-   */
   static PptTopLevel newPptTopLevel(String pptname, VarInfo[] vars) {
     return Common.makePptTopLevel(pptname, vars);
   }

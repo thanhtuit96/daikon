@@ -11,6 +11,9 @@ import typequals.prototype.qual.Prototype;
 
 /** Abstract base class for invariants over one variable of type {@code String}. */
 public abstract class SingleString extends UnaryInvariant {
+  // We are Serializable, so we specify a version to allow changes to
+  // method signatures without breaking serialization.  If you add or
+  // remove fields, you should change this number to the current date.
   static final long serialVersionUID = 20020122L;
 
   protected SingleString(PptSlice ppt) {
@@ -21,9 +24,10 @@ public abstract class SingleString extends UnaryInvariant {
     super();
   }
 
+  /** Returns whether or not the specified types are valid for unary string. */
   @Override
   public final boolean valid_types(VarInfo[] vis) {
-    return (vis.length == 1) && vis[0].file_rep_type.isString();
+    return ((vis.length == 1) && vis[0].file_rep_type.isString());
   }
 
   public VarInfo var(@GuardSatisfied @UnknownInitialization(SingleString.class) SingleString this) {
@@ -77,7 +81,7 @@ public abstract class SingleString extends UnaryInvariant {
    * @param count how many identical samples were observed in a row. For example, three calls to
    *     check_modified with a count parameter of 1 is equivalent to one call to check_modified with
    *     a count parameter of 3.
-   * @return true if the sample is consistent with the invariant
+   * @return whether or not the sample is consistent with the invariant
    */
   public abstract InvariantStatus check_modified(@Interned String value, int count);
 

@@ -24,8 +24,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.checkerframework.checker.initialization.qual.UnknownInitialization;
+import org.checkerframework.checker.interning.qual.Interned;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
-import org.checkerframework.checker.mustcall.qual.MustCallUnknown;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNullIf;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
@@ -43,12 +43,10 @@ import typequals.prototype.qual.Prototype;
 //
 
 /** Main class for non-instantiating suppression. Handles setup and other overall functions. */
-@SuppressWarnings("PMD.UseUtilityClass") // Bug in PMD: this class has a no-arg constructor.
 public class NIS {
 
-  /** Do not instantiate. */
   @SuppressWarnings("initialization.fields.uninitialized") // never instantiated
-  private NIS() {
+  public NIS() {
     throw new Error("Do not instantiate");
   }
 
@@ -115,17 +113,21 @@ public class NIS {
    * these states on each suppressor.
    */
   public enum SuppressState {
-    /** Initial state -- suppressor has not been checked yet. */
+    /** initial state -- suppressor has not been checked yet */
     NONE,
-    /** Suppressor matches the falsified invariant. */
+    /** suppressor matches the falsified invariant */
     MATCH,
-    /** Suppressor is true. */
+    /** suppressor is true */
     VALID,
-    /** Suppressor is not true. */
+    /** suppressor is not true */
     INVALID,
-    /** Suppressor contains a variable that has always been nonsensical. */
+    /** suppressor contains a variable that has always been nonsensical */
     NONSENSICAL
   }
+
+  // This should be an enum!!
+  /** initial state -- suppressor has not been checked yet */
+  static final @Interned String NONE = "none";
 
   /**
    * Map from invariant class to a list of all of the suppression sets that contain a suppressor of
@@ -164,30 +166,22 @@ public class NIS {
   // Statistics that are kept during processing.  Some of these are kept
   // and/or make sense for some approaches and not for others
 
-  /** If true, keep statistics. */
+  /** Whether or not to keep statistics. */
   public static boolean keep_stats = false;
-
   /** Number of falsified invariants in the program point. */
   public static int false_cnts = 0;
-
   /** Number of falsified invariants in the program point that are potential suppressors. */
   public static int false_invs = 0;
-
   /** Number of suppressions processed. */
   public static int suppressions_processed = 0;
-
   /** Number of suppressions processed by the falsified method. */
   public static int suppressions_processed_falsified = 0;
-
   /** Number of invariants that are no longer suppressed by a suppression. */
   static int new_invs_cnt = 0;
-
   /** Number of new_invs_cnt that are falsified by the sample. */
   public static int false_invs_cnt = 0;
-
   /** Number of invariants actually created. */
   public static int created_invs_cnt = 0;
-
   /** Number of invariants that are still suppressed. */
   static int still_suppressed_cnt = 0;
 
@@ -295,9 +289,7 @@ public class NIS {
     }
     // }
 
-    if (Debug.logDetail() && debug.isLoggable(Level.FINE)) {
-      dump(debug);
-    }
+    if (Debug.logDetail() && debug.isLoggable(Level.FINE)) dump(debug);
   }
 
   /**
@@ -423,9 +415,7 @@ public class NIS {
         inv.log("%s added to slice", inv.format());
       }
 
-      if (NIS.antecedent_method) {
-        created_invs_cnt++;
-      }
+      if (NIS.antecedent_method) created_invs_cnt++;
     }
 
     // Make a second pass through the new invariants and make sure that
@@ -666,9 +656,7 @@ public class NIS {
     // possibly create any newly unsuppressed invariants
     for (Iterator<Antecedents> i = comp_ants.values().iterator(); i.hasNext(); ) {
       Antecedents ants = i.next();
-      if (ants.false_cnt == 0) {
-        i.remove();
-      }
+      if (ants.false_cnt == 0) i.remove();
     }
     if (debugAnt.isLoggable(Level.FINE)) {
       for (Antecedents ants : comp_ants.values()) {
@@ -792,9 +780,7 @@ public class NIS {
     for (SupInv supinv : suppressed_invs) {
       Invariant inv = supinv.instantiate(ppt);
       if (inv != null) {
-        if (Debug.dkconfig_internal_check) {
-          assert inv.ppt.find_inv_exact(inv) == null;
-        }
+        if (Debug.dkconfig_internal_check) assert inv.ppt.find_inv_exact(inv) == null;
         inv.ppt.addInvariant(inv);
         created_invs.add(inv);
       }
@@ -865,9 +851,7 @@ public class NIS {
         if (!is_suppressor(inv.getClass())) {
           continue;
         }
-        if (inv.is_false()) {
-          false_cnt++;
-        }
+        if (inv.is_false()) false_cnt++;
         List<Invariant> antecedents =
             antecedent_map.computeIfAbsent(inv.getClass(), __ -> new ArrayList<Invariant>());
         antecedents.add(inv);
@@ -892,16 +876,11 @@ public class NIS {
     }
   }
 
-  /**
-   * Returns true if the specified class is an antecedent in any NI suppression.
-   *
-   * @param cls the class for some subtype of Invariant
-   * @return true if the specified class is an antecedent in any NI suppression
-   */
+  /** Returns true if the specified class is an antecedent in any NI suppression. */
   @RequiresNonNull("NIS.suppressor_map")
   @Pure
-  public static boolean is_suppressor(Class<? extends @MustCallUnknown Invariant> cls) {
-    return suppressor_map.containsKey(cls);
+  public static boolean is_suppressor(Class<? extends Invariant> cls) {
+    return (suppressor_map.containsKey(cls));
   }
 
   /** Dump out the suppressor map. */
@@ -940,16 +919,12 @@ public class NIS {
       this.suppressee = suppressee;
       this.vis = vis;
       this.ppt = ppt;
-      if (Debug.logOn()) {
-        log("Created " + suppressee);
-      }
+      if (Debug.logOn()) log("Created " + suppressee);
     }
 
     /** Track Log the specified message. */
     public void log(@UnknownInitialization(SupInv.class) SupInv this, String message) {
-      if (Debug.logOn()) {
-        Debug.log(suppressee.sup_class, ppt, vis, message);
-      }
+      if (Debug.logOn()) Debug.log(suppressee.sup_class, ppt, vis, message);
     }
 
     /** Equal iff classes / swap variable / and variables match exactly. */
@@ -1010,7 +985,7 @@ public class NIS {
       assert ss != null
           : "@AssumeAssertion(nullness):  dependent:  this invariant's class can be suppressed, so"
               + " ss != null";
-      return ss.suppressed(ppt, vis);
+      return (ss.suppressed(ppt, vis));
     }
 
     /** Instantiate this invariant on the specified ppt. */
@@ -1042,7 +1017,7 @@ public class NIS {
       return cinv;
     }
 
-    /** Returns string representation of the suppressed invariant. */
+    /** Return string representation of the suppressed invariant. */
     @SideEffectFree
     @Override
     public String toString(@GuardSatisfied SupInv this) {

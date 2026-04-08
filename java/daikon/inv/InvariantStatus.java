@@ -1,6 +1,5 @@
 package daikon.inv;
 
-import java.util.Locale;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.dataflow.qual.SideEffectFree;
 
@@ -22,6 +21,6 @@ public enum InvariantStatus {
   @SideEffectFree
   @Override
   public String toString(@GuardSatisfied InvariantStatus this) {
-    return name().toLowerCase(Locale.ENGLISH);
+    return name().toLowerCase();
   }
 }

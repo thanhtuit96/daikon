@@ -18,6 +18,9 @@ import org.plumelib.util.Intern;
  * sequences of numbers and strings.
  */
 public final class SequencesConcat extends BinaryDerivation {
+  // We are Serializable, so we specify a version to allow changes to
+  // method signatures without breaking serialization.  If you add or
+  // remove fields, you should change this number to the current date.
   static final long serialVersionUID = 20020122L;
 
   /** Debug tracer. */
@@ -57,15 +60,9 @@ public final class SequencesConcat extends BinaryDerivation {
     int mod1 = base1.getModified(full_vt);
     int mod2 = base2.getModified(full_vt);
 
-    if (mod1 == ValueTuple.MODIFIED) {
-      mod = ValueTuple.MODIFIED;
-    }
-    if (mod1 == ValueTuple.MISSING_NONSENSICAL) {
-      mod = ValueTuple.MISSING_NONSENSICAL;
-    }
-    if (mod2 == ValueTuple.MODIFIED) {
-      mod = ValueTuple.MODIFIED;
-    }
+    if (mod1 == ValueTuple.MODIFIED) mod = ValueTuple.MODIFIED;
+    if (mod1 == ValueTuple.MISSING_NONSENSICAL) mod = ValueTuple.MISSING_NONSENSICAL;
+    if (mod2 == ValueTuple.MODIFIED) mod = ValueTuple.MODIFIED;
     if (mod2 == ValueTuple.MISSING_NONSENSICAL) {
       mod = ValueTuple.MISSING_NONSENSICAL;
     }
@@ -114,6 +111,7 @@ public final class SequencesConcat extends BinaryDerivation {
     return (other instanceof SequencesConcat);
   }
 
+  /** Returns the ESC name for sequence subsequence. */
   @SideEffectFree
   @Override
   public String esc_name(String index) {

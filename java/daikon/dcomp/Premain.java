@@ -14,7 +14,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.io.UncheckedIOException;
 import java.lang.instrument.ClassDefinition;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
@@ -24,17 +23,15 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.bcel.*;
+import org.apache.bcel.classfile.*;
+import org.apache.bcel.generic.*;
 
 /**
  * This class is the entry point for the DynComp instrumentation agent. It is the only code in
  * dcomp_premain.jar.
  */
 public class Premain {
-
-  /** Do not instantiate. */
-  private Premain() {
-    throw new Error("Do not instantiate");
-  }
 
   // These command-line options cannot be accessed from DynComp.  These are internal debugging
   // options that may be used when Premain is invoked directly from the command line.
@@ -52,14 +49,7 @@ public class Premain {
   public static boolean debug_dcruntime_all = false;
 
   /** If true, print information about the classes being transformed. */
-  protected static boolean verbose;
-
-  /**
-   * Specifies if we are to use an instrumented version of the JDK. Calls into the JDK must be
-   * modified to remove the arguments from the tag stack if the JDK is not instrumented. The default
-   * value is set to true for BuildJDK. Other tools will set this flag based on their options.
-   */
-  protected static boolean jdk_instrumented = true; // default to true for BuildJDK
+  public static boolean verbose = false;
 
   /** Set of pre-instrumented JDK classes. */
   protected static Set<String> pre_instrumented = new HashSet<>();
@@ -128,17 +118,11 @@ public class Premain {
     // Because DynComp started Premain in a separate process, we must rescan
     // the options to set up the DynComp static variables.
     Options options = new Options(DynComp.synopsis, DynComp.class, Premain.class);
-    String[] target_args = options.parse(true, agentArgs.trim().split("  *"));
+    String[] target_args = options.parse(true, agentArgs.split("  *"));
     if (target_args.length > 0) {
       System.err.printf("Unexpected Premain arguments %s%n", Arrays.toString(target_args));
-      System.out.println();
       options.printUsage();
       System.exit(1);
-    }
-
-    // Turn on dumping of instrumented classes if debug was selected
-    if (DynComp.debug) {
-      DynComp.dump = true;
     }
 
     verbose = DynComp.verbose || DynComp.debug;
@@ -158,11 +142,9 @@ public class Premain {
     daikon.chicory.Runtime.ppt_omit_pattern = DynComp.ppt_omit_pattern;
     daikon.chicory.Runtime.ppt_select_pattern = DynComp.ppt_select_pattern;
 
-    // We need to load the BcelUtil class prior to turning on instrumentation.
-    @SuppressWarnings("UnusedVariable")
-    int toLoadBcelUtil = BcelUtil.javaVersion;
-
-    jdk_instrumented = !DynComp.no_jdk;
+    DCInstrument.jdk_instrumented = !DynComp.no_jdk;
+    @SuppressWarnings("UnusedVariable") // loads the BcelUtil class; otherwise, Premain gives errors
+    int junk = BcelUtil.javaVersion;
 
     // Another 'trick' to force needed classes to be loaded prior to retransformation.
     String buffer =
@@ -174,40 +156,30 @@ public class Premain {
     }
 
     // Read the list of pre-instrumented classes.
-    if (jdk_instrumented) {
+    if (DCInstrument.jdk_instrumented) {
       // location is: daikon/java/dcomp-rt/java/lang/jdk_classes.txt .
-      try (InputStream strm = Object.class.getResourceAsStream("jdk_classes.txt")) {
-        if (strm == null) {
-          System.err.println(
-              "Can't find jdk_classes.txt;"
-                  + " see Daikon manual, section \"Instrumenting the JDK with DynComp\"");
-          System.exit(1);
+      InputStream strm = Object.class.getResourceAsStream("jdk_classes.txt");
+      if (strm == null) {
+        System.err.println(
+            "Can't find jdk_classes.txt;"
+                + " see Daikon manual, section \"Instrumenting the JDK with DynComp\"");
+        System.exit(1);
+      }
+      BufferedReader reader = new BufferedReader(new InputStreamReader(strm, UTF_8));
+
+      while (true) {
+        String line = reader.readLine();
+        if (line == null) {
+          break;
         }
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(strm, UTF_8))) {
-          while (true) {
-            String line = reader.readLine();
-            if (line == null) {
-              break;
-            }
-            // System.out.printf("adding '%s'%n", line);
-            pre_instrumented.add(line);
-          }
-        }
+        // System.out.printf("adding '%s'%n", line);
+        pre_instrumented.add(line);
       }
     }
 
     // Setup the shutdown hook
     Thread shutdown_thread = new ShutdownThread();
     java.lang.Runtime.getRuntime().addShutdownHook(shutdown_thread);
-
-    // UNDONE: turn on Instrument24
-    String instrumenter = "daikon.dcomp.Instrument";
-    // String instrumenter;
-    // if (daikon.chicory.Runtime.isJava24orLater()) {
-    //   instrumenter = "daikon.dcomp.Instrument24";
-    // } else {
-    //   instrumenter = "daikon.dcomp.Instrument";
-    // }
 
     // Setup the transformer
     ClassFileTransformer transformer;
@@ -216,12 +188,12 @@ public class Premain {
     try {
       transformer =
           (ClassFileTransformer)
-              loader.loadClass(instrumenter).getDeclaredConstructor().newInstance();
+              loader.loadClass("daikon.dcomp.Instrument").getDeclaredConstructor().newInstance();
     } catch (Exception e) {
-      throw new RuntimeException("Error loading Instrumenter " + instrumenter, e);
+      throw new RuntimeException("Unexpected error loading Instrument", e);
     }
     if (verbose) {
-      // If jdk_instrumented is true then the printf below will output
+      // If DCInstrument.jdk_instrumented is true then the printf below will output
       // 'null' to indicate we are using the bootstrap loader.
       System.out.printf(
           "Classloader of transformer = %s%n", transformer.getClass().getClassLoader());
@@ -251,7 +223,7 @@ public class Premain {
     // dummy java.lang.DCRuntime with a version where each method calls the corresponding method in
     // daikon.dcomp.DCRuntime. The Java runtime does not enforce the security check in this case.
     //
-    if (daikon.chicory.Runtime.isJava9orLater() && jdk_instrumented) {
+    if (BcelUtil.javaVersion > 8 && DCInstrument.jdk_instrumented) {
 
       // Buffer for input of our replacement java.lang.DCRuntime.
       // The size of the current version is 6326 bytes and we do not
@@ -260,7 +232,8 @@ public class Premain {
       String classname = "daikon/dcomp-transfer/DCRuntime.class";
       URL class_url = ClassLoader.getSystemResource(classname);
       if (class_url != null) {
-        try (InputStream inputStream = class_url.openStream()) {
+        try {
+          InputStream inputStream = class_url.openStream();
           if (inputStream != null) {
             int size = inputStream.read(repClass, 0, repClass.length);
             byte[] truncated = new byte[size];
@@ -272,7 +245,7 @@ public class Premain {
             throw new Error("openStream failed for " + class_url);
           }
         } catch (Throwable t) {
-          throw new Error("Error reading " + class_url, t);
+          throw new Error("Unexpected error reading " + class_url, t);
         }
       } else {
         throw new Error("Could not locate " + classname);
@@ -296,7 +269,7 @@ public class Premain {
     @Override
     public void run() {
 
-      if (verbose) {
+      if (Premain.verbose) {
         System.out.println("in shutdown");
       }
       in_shutdown = true;
@@ -309,14 +282,14 @@ public class Premain {
 
       // If requested, write the comparability data to a file
       if (DynComp.comparability_file != null) {
-        if (verbose) {
+        if (Premain.verbose) {
           System.out.println("Writing comparability sets to " + DynComp.comparability_file);
         }
         PrintWriter compare_out = open(DynComp.comparability_file);
         long startTime = System.nanoTime();
         DCRuntime.printAllComparable(compare_out);
         compare_out.close();
-        if (verbose) {
+        if (Premain.verbose) {
           long duration = System.nanoTime() - startTime;
           System.out.printf(
               "Comparability sets written in %ds%n", TimeUnit.NANOSECONDS.toSeconds(duration));
@@ -324,14 +297,14 @@ public class Premain {
       }
 
       if (DynComp.trace_file != null) {
-        if (verbose) {
+        if (Premain.verbose) {
           System.out.println("Writing traced comparability sets to " + DynComp.trace_file);
         }
         PrintWriter trace_out = open(DynComp.trace_file);
         long startTime = System.nanoTime();
         DCRuntime.traceAllComparable(trace_out);
         trace_out.close();
-        if (verbose) {
+        if (Premain.verbose) {
           long duration = System.nanoTime() - startTime;
           System.out.printf(
               "Traced comparability sets written in %ds%n",
@@ -341,16 +314,14 @@ public class Premain {
         // Writing comparability sets to standard output?
       }
 
-      if (verbose) {
+      if (Premain.verbose) {
         DCRuntime.decl_stats();
       }
 
       // Write the decl file out
       @SuppressWarnings("nullness:argument") // DynComp guarantees decl_file is non null
       File decl_file = new File(DynComp.output_dir, DynComp.decl_file);
-      if (verbose) {
-        System.out.println("Writing decl file to " + decl_file);
-      }
+      if (Premain.verbose) System.out.println("Writing decl file to " + decl_file);
       PrintWriter decl_fp = open(decl_file);
       // Create DeclWriter so can share output code in Chicory.
       DCRuntime.declWriter = new DeclWriter(decl_fp);
@@ -361,7 +332,7 @@ public class Premain {
       long startTime = System.nanoTime();
       DCRuntime.printDeclFile(decl_fp);
       decl_fp.close();
-      if (verbose) {
+      if (Premain.verbose) {
         long duration = System.nanoTime() - startTime;
         System.out.printf("Decl file written in %ds%n", TimeUnit.NANOSECONDS.toSeconds(duration));
         System.out.printf("comp_list = %,d%n", DCRuntime.comp_list_ms);
@@ -369,9 +340,7 @@ public class Premain {
         System.out.printf("decl vars = %,d%n", DCRuntime.decl_vars_ms);
         System.out.printf("total     = %,d%n", DCRuntime.total_ms);
       }
-      if (verbose) {
-        System.out.println("DynComp complete");
-      }
+      if (Premain.verbose) System.out.println("DynComp complete");
     }
   }
 
@@ -386,15 +355,15 @@ public class Premain {
     try {
       canonicalFile = filename.getCanonicalFile();
     } catch (IOException e) {
-      throw new UncheckedIOException(
-          "Can't get canonical file for " + filename + " in " + System.getProperty("user.dir"), e);
+      throw new Error(
+          "Can't get canonical file for " + filename + " in " + System.getProperty("user.dir"));
     }
 
     // I don't know why, but without this, the call to newBufferedWriter fails in some contexts.
     try {
       canonicalFile.createNewFile();
     } catch (IOException e) {
-      throw new UncheckedIOException("createNewFile failed for " + canonicalFile, e);
+      throw new Error("createNewFile failed for " + canonicalFile, e);
     }
 
     try {
@@ -402,23 +371,5 @@ public class Premain {
     } catch (Exception e) {
       throw new Error("Can't open " + filename + " = " + canonicalFile, e);
     }
-  }
-
-  /** Name prefix for tag setter methods. */
-  protected static final String SET_TAG = "set_tag";
-
-  /** Name prefix for tag getter methods. */
-  protected static final String GET_TAG = "get_tag";
-
-  /**
-   * Returns a field tag accessor method name.
-   *
-   * @param type "get_tag" or "set_tag"
-   * @param classname name of class
-   * @param fname name of field
-   * @return name of tag accessor method
-   */
-  static String tag_method_name(String type, String classname, String fname) {
-    return fname + "_" + classname.replace('.', '_') + "__$" + type;
   }
 }

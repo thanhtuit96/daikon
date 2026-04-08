@@ -3,9 +3,8 @@ package daikon.split;
 import java.util.ArrayList;
 import java.util.List;
 import jtb.ParseException;
-import jtb.syntaxtree.Node;
-import jtb.syntaxtree.NodeToken;
-import jtb.visitor.DepthFirstVisitor;
+import jtb.syntaxtree.*;
+import jtb.visitor.*;
 
 /**
  * TokenExtractor is a visitor for a jtb syntax tree that returns all the tokens from a expression

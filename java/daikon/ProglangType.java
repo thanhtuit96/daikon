@@ -13,7 +13,6 @@ import java.util.List;
 import org.checkerframework.checker.interning.qual.Interned;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.Nullable;
-import org.checkerframework.checker.signedness.qual.Signed;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
 import org.plumelib.util.Intern;
@@ -45,6 +44,9 @@ import org.plumelib.util.StringsPlume;
 // known_types = integral_types + ("pointer", "address")
 
 public final @Interned class ProglangType implements Serializable {
+  // We are Serializable, so we specify a version to allow changes to
+  // method signatures without breaking serialization.  If you add or
+  // remove fields, you should change this number to the current date.
   static final long serialVersionUID = 20020122L;
 
   /** Maps from a base type name to its ProglangTypes and arrays with that base. */
@@ -87,7 +89,7 @@ public final @Interned class ProglangType implements Serializable {
   private int dimensions;
 
   /**
-   * Returns the number of dimensions (zero for a non-array).
+   * Return the number of dimensions (zero for a non-array).
    *
    * @return the number of dimensions
    */
@@ -343,9 +345,7 @@ public final @Interned class ProglangType implements Serializable {
     } else {
       long val;
       if ((value.length() > 2) && (value.charAt(0) == '0') && (value.charAt(1) == 'x')) {
-        @SuppressWarnings("signedness:assignment")
-        @Signed long temp = Long.parseUnsignedLong(value.substring(2), 16);
-        val = temp;
+        val = Long.parseLong(value.substring(2), 16);
       } else {
         val = Long.parseLong(value);
       }
@@ -566,12 +566,9 @@ public final @Interned class ProglangType implements Serializable {
       for (int i = 0; i < len; i++) {
         if (value_strings[i].equals("nonsensical")) {
           return null;
-        } else if (value_strings[i].equals("null")) {
-          result[i] = 0;
-        } else if (value_strings[i].equalsIgnoreCase("NaN")) {
-          result[i] = Double.NaN;
-        } else if (value_strings[i].equalsIgnoreCase("Infinity")
-            || value_strings[i].equals("inf")) {
+        } else if (value_strings[i].equals("null")) result[i] = 0;
+        else if (value_strings[i].equalsIgnoreCase("NaN")) result[i] = Double.NaN;
+        else if (value_strings[i].equalsIgnoreCase("Infinity") || value_strings[i].equals("inf")) {
           result[i] = Double.POSITIVE_INFINITY;
         } else if (value_strings[i].equalsIgnoreCase("-Infinity")
             || value_strings[i].equals("-inf")) {
@@ -629,7 +626,7 @@ public final @Interned class ProglangType implements Serializable {
 
   @Pure
   public boolean isPrimitive() {
-    return (dimensions == 0) && baseIsPrimitive();
+    return ((dimensions == 0) && baseIsPrimitive());
   }
 
   // Does not include boolean.  Is that intentional?  (If it were added,
@@ -646,20 +643,20 @@ public final @Interned class ProglangType implements Serializable {
 
   @Pure
   public boolean isIntegral() {
-    return (dimensions == 0) && baseIsIntegral();
+    return ((dimensions == 0) && baseIsIntegral());
   }
 
   // More efficient than elementType().isIntegral()
   public boolean elementIsIntegral() {
-    return (dimensions == 1) && baseIsIntegral();
+    return ((dimensions == 1) && baseIsIntegral());
   }
 
   public boolean elementIsFloat() {
-    return (dimensions == 1) && baseIsFloat();
+    return ((dimensions == 1) && baseIsFloat());
   }
 
   public boolean elementIsString() {
-    return (dimensions == 1) && baseIsString();
+    return ((dimensions == 1) && baseIsString());
   }
 
   // Return true if this variable is sensible as an array index.
@@ -672,53 +669,53 @@ public final @Interned class ProglangType implements Serializable {
   public boolean isScalar() {
     // For reptypes, checking against INT is sufficient, rather than
     // calling isIntegral().
-    return isIntegral() || (this == HASHCODE) || (this == BOOLEAN);
+    return (isIntegral() || (this == HASHCODE) || (this == BOOLEAN));
   }
 
   public boolean baseIsScalar() {
-    return baseIsIntegral() || (base == BASE_BOOLEAN) || (base == BASE_HASHCODE);
+    return (baseIsIntegral() || (base == BASE_BOOLEAN) || (base == BASE_HASHCODE));
   }
 
   public boolean baseIsBoolean() {
-    return base == BASE_BOOLEAN;
+    return (base == BASE_BOOLEAN);
   }
 
   public boolean baseIsFloat() {
-    return (base == BASE_DOUBLE) || (base == BASE_FLOAT);
+    return ((base == BASE_DOUBLE) || (base == BASE_FLOAT));
   }
 
   @Pure
   public boolean isFloat() {
-    return (dimensions == 0) && baseIsFloat();
+    return ((dimensions == 0) && baseIsFloat());
   }
 
   /**
-   * Returns true if this is java.lang.Object.
+   * Return true if this is java.lang.Object.
    *
    * @return true if this is java.lang.Object
    */
   @Pure
   public boolean isObject() {
-    return (dimensions == 0) && baseIsObject();
+    return ((dimensions == 0) && baseIsObject());
   }
 
   /**
-   * Returns true if the base (the final element type) is a reference type rather than integer,
+   * Return true if the base (the final element type) is a reference type rather than integer,
    * float, or boolean.
    *
    * @return true if the base is Object
    */
   public boolean baseIsObject() {
-    return !baseIsIntegral() && !baseIsFloat() && !(base == BASE_BOOLEAN);
+    return (!baseIsIntegral() && !baseIsFloat() && !(base == BASE_BOOLEAN));
   }
 
   public boolean baseIsString() {
-    return base == BASE_STRING;
+    return (base == BASE_STRING);
   }
 
   @Pure
   public boolean isString() {
-    return (dimensions == 0) && baseIsString();
+    return ((dimensions == 0) && baseIsString());
   }
 
   public boolean baseIsHashcode() {
@@ -727,17 +724,17 @@ public final @Interned class ProglangType implements Serializable {
 
   @Pure
   public boolean isHashcode() {
-    return (dimensions == 0) && baseIsHashcode();
+    return ((dimensions == 0) && baseIsHashcode());
   }
 
   /** Does this type represent a pointer? Should only be applied to file_rep types. */
   @Pure
   public boolean isPointerFileRep() {
-    return base == BASE_HASHCODE;
+    return (base == BASE_HASHCODE);
   }
 
   /**
-   * Returns true if these two types can be sensibly compared to one another, or if one can be cast
+   * Return true if these two types can be sensibly compared to one another, or if one can be cast
    * to the other. For instance, int is castable to long, but boolean is not castable to float, and
    * int is not castable to int[]. This is a reflexive relationship, but not a transitive one
    * because it might not be true for two children of a superclass, even though it's true for the
@@ -765,14 +762,13 @@ public final @Interned class ProglangType implements Serializable {
   }
 
   /**
-   * Returns true if these two types can be sensibly compared to one another, and if non-integral,
+   * Return true if these two types can be sensibly compared to one another, and if non-integral,
    * whether this could be a superclass of other. A List is comparableOrSuperclassOf to a ArrayList,
    * but not the other way around. This is a transitive method, but not reflexive.
    */
   public boolean comparableOrSuperclassOf(ProglangType other) {
-    if (this == other) { // ProglangType objects are interned
-      return true;
-    }
+    if (this == other) // ProglangType objects are interned
+    return true;
     if (this.dimensions != other.dimensions) {
       return false;
     }
@@ -782,9 +778,8 @@ public final @Interned class ProglangType implements Serializable {
       return true;
     }
     // Make Object castable to everything, except booleans
-    if ((this.base == BASE_OBJECT) && other.baseIsObject()) { // interned strings
-      return true;
-    }
+    if ((this.base == BASE_OBJECT) && other.baseIsObject()) // interned strings
+    return true;
 
     return false;
   }
@@ -812,8 +807,8 @@ public final @Interned class ProglangType implements Serializable {
   }
 
   /**
-   * Returns true if this declared type is a function pointer Only valid if the front end marks the
-   * function pointer with the name '*func'.
+   * Returns whether or not this declared type is a function pointer Only valid if the front end
+   * marks the function pointer with the name '*func'.
    */
   @Pure
   public boolean is_function_pointer() {

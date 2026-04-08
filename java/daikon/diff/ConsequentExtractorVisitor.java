@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
@@ -33,7 +34,7 @@ public class ConsequentExtractorVisitor extends DepthFirstVisitor {
   }
 
   @Override
-  public void visit(PptNode node) {
+  public void visit(@NonNull PptNode node) {
     assert node.getPpt1() != null
         : "@AssumeAssertion(nullness): method precondition: has a (non-null) consequent";
     if (node.getPpt1() instanceof PptConditional) {

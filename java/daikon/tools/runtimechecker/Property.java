@@ -19,20 +19,18 @@ public class Property implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  /** Maps into all the Property objects created. */
+  // Maps into all the Property objects created.
   private static HashMap<Integer, Property> propertiesMap = new HashMap<>();
 
-  /** The signature of the method that this property describes. */
-  private final String methodSignature;
-
-  /** The signature of the method that this property describes. ("null" for object invariants.) */
-  public String methodSignature(@GuardSatisfied Property this) {
-    return methodSignature;
+  // The name of the method that this property describes.
+  private final String method;
+  /** The name of the method that this property describes. ("null" for object invariants.) */
+  public String method(@GuardSatisfied Property this) {
+    return method;
   }
 
   // The kind of proerty (enter, exit or objectInvariant).
   private final Kind kind;
-
   /** The kind of property (enter, exit or objectInvariant). */
   public Kind kind(@GuardSatisfied Property this) {
     return kind;
@@ -40,7 +38,6 @@ public class Property implements Serializable {
 
   /** Daikon representation (as output by Daikon's default output format). */
   private final String daikonRep;
-
   /** Daikon representation (as output by Daikon's default output format). */
   public String daikonRep(@GuardSatisfied Property this) {
     return daikonRep;
@@ -62,13 +59,13 @@ public class Property implements Serializable {
   private Property(
       Kind kind,
       String daikonRep,
-      String methodSignature,
+      String method,
       String jmlRep,
       String daikonClass,
       double confidence) {
     this.kind = kind;
     this.daikonRep = daikonRep;
-    this.methodSignature = methodSignature;
+    this.method = method;
     this.jmlRep = jmlRep;
     this.daikonClass = daikonClass;
     this.confidence = confidence;
@@ -139,8 +136,8 @@ public class Property implements Serializable {
   }
 
   /**
-   * Two properties are equal if their fields {@code daikonRep}, {@code methodSignature} and {@code
-   * kind} are equal. The other fields may differ.
+   * Two properties are equal if their fields {@code daikonRep}, {@code method} and {@code kind} are
+   * equal. The other fields may differ.
    */
   @EnsuresNonNullIf(result = true, expression = "#1")
   @Pure
@@ -154,16 +151,14 @@ public class Property implements Serializable {
     }
     Property anno = (Property) o;
     return (this.daikonRep().equals(anno.daikonRep())
-        && this.methodSignature().equals(anno.methodSignature())
+        && this.method().equals(anno.method())
         && this.kind().equals(anno.kind()));
   }
 
   @Pure
   @Override
   public int hashCode(@GuardSatisfied Property this) {
-    return daikonRep.hashCode()
-        + kind.hashCode()
-        + (methodSignature == null ? 0 : methodSignature.hashCode());
+    return daikonRep.hashCode() + kind.hashCode() + (method == null ? 0 : method.hashCode());
   }
 
   /**
@@ -238,7 +233,7 @@ public class Property implements Serializable {
         + daikonRep
         + " </DAIKON> "
         + "<METHOD> "
-        + methodSignature
+        + method
         + " </METHOD>"
         + "<INV>"
         + jmlRep
@@ -265,7 +260,7 @@ public class Property implements Serializable {
         + daikonRep
         + " </DAIKON> "
         + "<METHOD> "
-        + methodSignature
+        + method
         + " </METHOD>"
         + " <CONFIDENCE>"
         + confidence
@@ -323,13 +318,13 @@ public class Property implements Serializable {
   private static Property get(
       Kind kind,
       String daikonRep,
-      String methodSignature,
+      String method,
       String jmlRep,
       String daikonClass,
       double confidence)
       throws MalformedPropertyException {
 
-    Property anno = new Property(kind, daikonRep, methodSignature, jmlRep, daikonClass, confidence);
+    Property anno = new Property(kind, daikonRep, method, jmlRep, daikonClass, confidence);
     Integer key = anno.hashCode();
     if (propertiesMap.containsKey(key)) {
       return propertiesMap.get(key);
@@ -505,7 +500,7 @@ public class Property implements Serializable {
     } else if (kind == Kind.objectInvariant || kind == Kind.classInvariant) {
       ret = 1.0;
       //         } else if (properties != null
-      //                 && (properties.methodAnnos(this.methodSignature()).length
+      //                 && (properties.methodAnnos(this.method()).length
       //                     < ANNOS_PER_METHOD_FOR_GOOD_QUALITY)) {
       //             ret = 0.9;
     } else {
@@ -542,7 +537,7 @@ public class Property implements Serializable {
   private Object readResolve() throws ObjectStreamException {
     try {
 
-      Property anno = get(kind(), daikonRep(), methodSignature(), jmlRep, daikonClass, confidence);
+      Property anno = get(kind(), daikonRep(), method(), jmlRep, daikonClass, confidence);
       assert anno.jmlRep == null || anno.jmlRep.equals(this.jmlRep)
           : "anno.jmlRep==" + anno.jmlRep + " this.jmlRep==" + this.jmlRep;
       assert anno.daikonClass == null || anno.daikonClass.equals(this.daikonClass)

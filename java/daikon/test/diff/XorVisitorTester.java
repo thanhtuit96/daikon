@@ -1,6 +1,5 @@
 package daikon.test.diff;
 
-import static java.util.logging.Level.INFO;
 import static org.junit.Assert.assertEquals;
 
 import daikon.*;
@@ -16,10 +15,9 @@ public class XorVisitorTester {
 
   private Diff diff = new Diff(true, new Invariant.ClassVarnameFormulaComparator());
 
-  /** prepare for tests */
   @BeforeClass
   public static void setUpClass() {
-    daikon.LogHelper.setupLogs(INFO);
+    daikon.LogHelper.setupLogs(LogHelper.INFO);
     FileIO.new_decl_format = true;
   }
 

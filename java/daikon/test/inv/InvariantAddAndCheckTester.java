@@ -21,12 +21,9 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.LineNumberReader;
-import java.io.UncheckedIOException;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.StringTokenizer;
 import junit.framework.*;
@@ -52,8 +49,8 @@ import typequals.prototype.qual.Prototype;
  *
  * <p>Each command line is starts with a command: "add:" or "check:". Following the command comes
  * the arguments to be checked or added to the invariant. These arguments should be in the same
- * format as in a dtrace file. Next comes the InvariantStatus that is expected to be returned by the
- * check or add command on checking or adding the arguments. Finally, the expected format of the
+ * format as in a dtrace file. Next comes the the InvariantStatus that is expected to be returned by
+ * the check or add command on checking or adding the arguments. Finally, the expected format of the
  * Invariant after checking or adding the arguments is included. (The format of the invariant is
  * given by "Invariant.format_using(OutputFormat.DAIKON)")
  *
@@ -171,12 +168,8 @@ public class InvariantAddAndCheckTester {
    * @return false if any tests fail
    */
   private static boolean execute() {
-    String output;
-    try (LineNumberReader commandReader = getCommands()) {
-      output = performTest(commandReader);
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    }
+    LineNumberReader commandReader = getCommands();
+    String output = performTest(commandReader);
 
     if (output == null) { // no errors
       return true;
@@ -329,7 +322,7 @@ public class InvariantAddAndCheckTester {
      *
      * @return a string containing error messages for any failed cases
      */
-    static @Nullable String runTest(LineNumberReader commands) {
+    public static @Nullable String runTest(LineNumberReader commands) {
       boolean endOfFile = initFields(commands, false);
       if (endOfFile) {
         return null;
@@ -338,11 +331,11 @@ public class InvariantAddAndCheckTester {
         String commandLine = getNextRealLine(commands);
         int lineNumber = commands.getLineNumber();
         if (InvariantAddAndCheckTester.isComment(commandLine)) {
-          // continue;
+          continue;
         } else if (isTestTerminator(commandLine)) {
           break;
         } else if (isAddCommand(commandLine) || isCheckCommand(commandLine)) {
-          executeCheckOrAddCommand(commandLine, lineNumber);
+          exicuteCheckOrAddCommand(commandLine, lineNumber);
         } else if (isCompareCommand(commandLine)) {
         } else {
           throw new RuntimeException("unrecognized command");
@@ -358,8 +351,7 @@ public class InvariantAddAndCheckTester {
      * @return a String containing the proper add and check commands for this input lines of this
      *     test case
      */
-    @SuppressWarnings("UnusedMethod")
-    static @Nullable String generateTest(LineNumberReader commands) {
+    public static @Nullable String generateTest(LineNumberReader commands) {
       boolean endOfFile = initFields(commands, true);
       if (endOfFile) {
         return null;
@@ -405,8 +397,7 @@ public class InvariantAddAndCheckTester {
       Class<? extends Invariant> classToTest = asInvClass(getClass(className));
 
       try {
-        @SuppressWarnings("UnusedVariable")
-        Field ignore = classToTest.getField("dkconfig_enabled"); // Enable if needs to be done
+        classToTest.getField("dkconfig_enabled"); // Enable if needs to be done
         InvariantAddAndCheckTester.config.apply(className + ".enabled", "true");
       } catch (NoSuchFieldException e) { // Otherwise do nothing
       }
@@ -441,14 +432,14 @@ public class InvariantAddAndCheckTester {
     }
 
     /**
-     * Given a line from a command file, generates and executes the appropriate check or add
-     * command, and checks the results against the goal. If the results and goal do not match, a
-     * message is added to the results string buffer.
+     * Given a line from a command file, generates executes the appropriate check or add command and
+     * checks the results against the goal. If the results and goal do not match, a message is added
+     * to the results string buffer.
      */
-    private static void executeCheckOrAddCommand(String command, int lineNumber) {
+    private static void exicuteCheckOrAddCommand(String command, int lineNumber) {
 
       // remove the command
-      String args = command.substring(command.indexOf(':') + 1);
+      String args = command.substring(command.indexOf(":") + 1);
 
       StringTokenizer tokens = new StringTokenizer(args, argDivider);
       if (tokens.countTokens() != types.length + 2) {
@@ -465,17 +456,10 @@ public class InvariantAddAndCheckTester {
       tokens.nextToken(); // executed for side effect
       assertFalse(tokens.hasMoreTokens());
       InvariantStatus resultStatus;
-      try {
-        if (isCheckCommand(command)) {
-          resultStatus = getCheckStatus(params);
-        } else {
-          resultStatus = getAddStatus(params);
-        }
-      } catch (Exception e) {
-        throw new Error(
-            String.format(
-                "Problem with \"%s\" on line %d of %s", command, lineNumber, commandsFileName),
-            e);
+      if (isCheckCommand(command)) {
+        resultStatus = getCheckStatus(params);
+      } else {
+        resultStatus = getAddStatus(params);
       }
       if (resultStatus != goalStatus) {
         results.append(
@@ -495,7 +479,7 @@ public class InvariantAddAndCheckTester {
     /** Given a line from an input file, generates appropriate check or add command. */
     private static void generateCheckOrAddCommand(String command, int lineNumber) {
       // remove the command
-      String args = command.substring(command.indexOf(':') + 1);
+      String args = command.substring(command.indexOf(":") + 1);
 
       StringTokenizer tokens = new StringTokenizer(args, argDivider);
       if (tokens.countTokens() != types.length) {
@@ -555,14 +539,7 @@ public class InvariantAddAndCheckTester {
       try {
         return (InvariantStatus) addModified.invoke(invariantToTest, params);
       } catch (Exception e) {
-        throw new RuntimeException(
-            "getAddStatus: error invoking addModified("
-                + Arrays.toString(params)
-                + ") on "
-                + invariantToTest.getClass()
-                + "; commandsFileName="
-                + commandsFileName,
-            e);
+        throw new RuntimeException(" error in " + invariantToTest.getClass() + ": " + e);
       }
     }
 
@@ -676,7 +653,6 @@ public class InvariantAddAndCheckTester {
       }
       throw new RuntimeException("Cannot find format_using method");
     }
-
     /**
      * This function loads a class from file into the JVM given its fully-qualified name.
      *

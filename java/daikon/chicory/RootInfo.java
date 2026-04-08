@@ -10,11 +10,9 @@ import java.util.Arrays;
  * It contains no variable information other than what is stored in its children.
  */
 @SuppressWarnings("nullness") // to do
-public final class RootInfo extends DaikonVariableInfo {
-
-  /** Creates a RootInfo object. */
+public class RootInfo extends DaikonVariableInfo {
   private RootInfo() {
-    // The root needs no name, etc., but set them to preserve nullness property.
+    // the root needs no name, etc. but set them to preserve nullness property
     super(" RootInfo Object ", " RootInfo Object type ", " RootInfo Object reptype ");
   }
 
@@ -46,7 +44,7 @@ public final class RootInfo extends DaikonVariableInfo {
           mi.class_info,
           Modifier.isStatic(mi.member.getModifiers()),
           mi.member.getDeclaringClass(),
-          /* offset= */ "",
+          /*offset = */ "",
           depth);
     }
 
@@ -123,7 +121,7 @@ public final class RootInfo extends DaikonVariableInfo {
     ppt_statics.clear();
 
     root.addClassVars(
-        cinfo, /* dontPrintInstanceVars= */ false, cinfo.clazz, /* offset= */ "", depth);
+        cinfo, /*dontPrintInstanceVars = */ false, cinfo.clazz, /*offset = */ "", depth);
 
     // debug_vars.log("exit getObjectPpt%n");
 
@@ -146,7 +144,7 @@ public final class RootInfo extends DaikonVariableInfo {
     ppt_statics.clear();
 
     root.addClassVars(
-        cinfo, /* dontPrintInstanceVars= */ true, cinfo.clazz, /* offset= */ "", depth);
+        cinfo, /*dontPrintInstanceVars = */ true, cinfo.clazz, /*offset = */ "", depth);
 
     // debug_vars.log("exit getClassPpt%n");
 

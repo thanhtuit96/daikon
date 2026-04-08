@@ -50,8 +50,7 @@ import org.checkerframework.dataflow.qual.SideEffectFree;
  * Obviously, the tool Annotate outputs well-formed annotations, so the user shouldn't have to worry
  * too much about well-formedness.
  *
- * <p>Two annotations are equal iff their fields "daikonRep", "methodSignature" and "kind" are
- * equal.
+ * <p>Two annotations are equal iff their fields "daikonRep", "method" and "kind" are equal.
  *
  * <p>The factory method get(String annoString) returns an annotation that equals to the annotation
  * represented by annoString. In particular, if the same String is given twice to get(String
@@ -64,29 +63,24 @@ public class Annotation {
 
   /** Daikon representation (as output by Daikon's default output format). */
   private final String daikonRep;
-
   /** The way this annotation would be printed by Daikon. */
   public String daikonRep(@GuardSatisfied Annotation this) {
     return daikonRep;
   }
 
-  /** The signature of the method. */
-  private final String methodSignature;
-
+  private final String method;
   /** The method that this annotation refers to. */
-  public String methodSignature(@GuardSatisfied Annotation this) {
-    return methodSignature;
+  public String method(@GuardSatisfied Annotation this) {
+    return method;
   }
 
   private final Kind kind;
-
   /** The kind of this annotation. */
   public Kind kind(@GuardSatisfied Annotation this) {
     return kind;
   }
 
   private String invRep;
-
   /**
    * Representation of this annotation (the format depends on which output format was used to create
    * the annotation in Daikon; it's one of JAVA, JML, ESC or DBC).
@@ -96,27 +90,16 @@ public class Annotation {
   }
 
   public String daikonClass;
-
   /** The Daikon class name that this invariant represents an instance of. */
   public String daikonClass() {
     return daikonClass;
   }
 
-  /**
-   * Creates an Annotation.
-   *
-   * @param daikonRep the way this annotation would be printed by Daikon
-   * @param methodSignature the signature of the method
-   * @param kind the kind of this annotation
-   * @param invRep representation of this annotation (the format depends on which output format was
-   *     used to create the annotation in Daikon; it's one of JAVA, JML, ESC or DBC).
-   * @param daikonClass the Daikon class name that this invariant represents an instance of
-   */
   private Annotation(
-      Kind kind, String daikonRep, String methodSignature, String invRep, String daikonClass) {
+      Kind kind, String daikonRep, String method, String invRep, String daikonClass) {
     this.kind = kind;
     this.daikonRep = daikonRep;
-    this.methodSignature = methodSignature;
+    this.method = method;
     this.invRep = invRep;
     this.daikonClass = daikonClass;
   }
@@ -180,7 +163,7 @@ public class Annotation {
         + daikonRep
         + " </DAIKON> "
         + "<METHOD> "
-        + methodSignature
+        + method
         + " </METHOD>"
         + "<INV>"
         + invRep
@@ -284,9 +267,7 @@ public class Annotation {
     return kind.toString() + " : " + daikonRep();
   }
 
-  /**
-   * Two annotations are equal iff their fields "daikonRep", "methodSignature" and "kind" are equal.
-   */
+  /** Two annotations are equal iff their fields "daikonRep", "method" and "kind" are equal. */
   @EnsuresNonNullIf(result = true, expression = "#1")
   @Pure
   @Override
@@ -299,22 +280,22 @@ public class Annotation {
     }
     Annotation anno = (Annotation) o;
     return (this.daikonRep().equals(anno.daikonRep())
-        && this.methodSignature().equals(anno.methodSignature())
+        && this.method().equals(anno.method())
         && this.kind().equals(anno.kind()));
   }
 
   @Pure
   @Override
   public int hashCode(@GuardSatisfied Annotation this) {
-    return daikonRep.hashCode() + kind.hashCode() + methodSignature.hashCode();
+    return daikonRep.hashCode() + kind.hashCode() + method.hashCode();
   }
 
   /** Get the annotation with corresponding properties. */
   public static Annotation get(
-      Kind kind, String daikonRep, String methodSignature, String invRep, String daikonClass)
+      Kind kind, String daikonRep, String method, String invRep, String daikonClass)
       throws Annotation.MalformedAnnotationException {
 
-    Annotation anno = new Annotation(kind, daikonRep, methodSignature, invRep, daikonClass);
+    Annotation anno = new Annotation(kind, daikonRep, method, invRep, daikonClass);
     Integer key = anno.hashCode();
     if (annotationsMap.containsKey(key)) {
       return annotationsMap.get(key);

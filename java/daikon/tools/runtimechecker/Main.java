@@ -2,7 +2,6 @@ package daikon.tools.runtimechecker;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * Main entrypoint for the instrumenter. Passes control to whichever handler can handle the
@@ -16,12 +15,6 @@ public class Main extends CommandHandler {
     }
   }
 
-  /**
-   * Entry point for the instrumenter. Passes control to whichever handler can handle the
-   * user-specified command.
-   *
-   * @param args the arguments to the program
-   */
   public void nonStaticMain(String[] args) {
 
     List<CommandHandler> handlers =
@@ -33,7 +26,7 @@ public class Main extends CommandHandler {
           "For more help, invoke the instrumenter with \"help\" as its sole argument.");
       System.exit(1);
     }
-    if (args[0].toUpperCase(Locale.ENGLISH).equals("HELP") || args[0].equals("?")) {
+    if (args[0].toUpperCase().equals("HELP") || args[0].equals("?")) {
       usageMessage();
       usageMessage(handlers);
       System.exit(0);

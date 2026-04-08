@@ -156,7 +156,7 @@ public class SplitterFactoryTestUpdater {
     // file.renameTo(to) fails if the two files are on different file systems
     // (e.g., /tmp and /scratch may be different).
     // So read and write the file directly rather than using renameTo().
-    FilesPlume.writeString(to, FilesPlume.readString(from.toPath()));
+    FilesPlume.writeFile(to, FilesPlume.readFile(from));
   }
 
   /** Writes the new code for "SplitterFactoryTest.java". */
@@ -166,11 +166,10 @@ public class SplitterFactoryTestUpdater {
       // Delete the file, in case it is unwriteable (in which case deleting
       // works, but overwriting does not).
       new File(splitDir + "SplitterFactoryTest.java").delete();
-      try (BufferedWriter writer =
-          FilesPlume.newBufferedFileWriter(splitDir + "SplitterFactoryTest.java")) {
-        writer.write(code);
-        writer.flush();
-      }
+      BufferedWriter writer =
+          FilesPlume.newBufferedFileWriter(splitDir + "SplitterFactoryTest.java");
+      writer.write(code);
+      writer.flush();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -225,11 +224,6 @@ public class SplitterFactoryTestUpdater {
     ps.println("  // Because the SplitterFactory sequentially numbers the");
     ps.println("  // java files it produces, changing the order that the setUpTests");
     ps.println("  // commands are run will cause the tests to fail.");
-    ps.println();
-    ps.println("  /** Do not instantiate. */");
-    ps.println("  private SplitterFactoryTest() {");
-    ps.println("    throw new Error(\"Do not instantiate\");");
-    ps.println("  }");
     ps.println();
     ps.println("  private static String targetDir = \"" + targetDir + "\";");
     ps.println();

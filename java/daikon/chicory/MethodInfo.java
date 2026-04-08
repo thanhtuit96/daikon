@@ -10,7 +10,6 @@ import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 import org.checkerframework.checker.signature.qual.ClassGetName;
-import org.checkerframework.checker.signature.qual.Identifier;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
 
@@ -35,7 +34,7 @@ public class MethodInfo {
   /**
    * Method name. For example: "public static void sort(int[] arr)" would have method_name "sort".
    */
-  public @Identifier String method_name;
+  public String method_name;
 
   /** Array of argument names for this method. */
   public String[] arg_names;
@@ -49,7 +48,7 @@ public class MethodInfo {
   /** Array of argument types as classes for this method. */
   public Class<?>[] arg_types;
 
-  /** Exit locations for this method. */
+  /** exit locations for this method */
   public List<Integer> exit_locations;
 
   /** Tells whether each exit point in method is instrumented, based on filters. */
@@ -76,7 +75,7 @@ public class MethodInfo {
   public int capture_cnt = 0;
 
   /**
-   * True if the method is pure (has no side-effects). Will only be set to true if the {@code
+   * Whether or not the method is pure (has no side-effects). Will only be set to true if the {@code
    * --purity-analysis} command-line option is given to Chicory, and the method returns some value.
    * Only set during initViaReflection() method.
    */
@@ -85,7 +84,7 @@ public class MethodInfo {
   /** Creates a MethodInfo with the specified class, arg_names, and exit locations. */
   public MethodInfo(
       ClassInfo class_info,
-      @Identifier String method_name,
+      String method_name,
       String[] arg_names,
       @ClassGetName String[] arg_type_strings,
       List<Integer> exit_locations,
@@ -150,7 +149,7 @@ public class MethodInfo {
       if (is_class_initializer()) {
         member = null;
         // This case DOES occur at run time.  -MDE 1/22/2010
-      } else if (isConstructor()) {
+      } else if (is_constructor()) {
         member = class_info.clazz.getDeclaredConstructor(arg_types);
       } else {
         member = class_info.clazz.getDeclaredMethod(method_name, arg_types);
@@ -181,8 +180,8 @@ public class MethodInfo {
    * @return true iff this method is a constructor
    */
   @Pure
-  public boolean isConstructor() {
-    return method_name.equals("<init>") || method_name.equals("");
+  public boolean is_constructor() {
+    return (method_name.equals("<init>") || method_name.equals(""));
   }
 
   /**
@@ -192,7 +191,7 @@ public class MethodInfo {
    */
   @Pure
   public boolean is_class_initializer() {
-    return method_name.equals("<clinit>");
+    return (method_name.equals("<clinit>"));
   }
 
   /**
@@ -214,31 +213,24 @@ public class MethodInfo {
   public void init_traversal(int depth) {
 
     traversalEnter = RootInfo.enter_process(this, depth);
-
-    if (false) {
-      System.out.printf("Method %s.%s: %n ", class_info.clazz.getName(), this);
-      System.out.printf("Enter daikon variable tree%n%s%n", traversalEnter.treeString());
-    }
+    // System.out.printf("Method %s.%s: %n ", class_info.clazz.getName(),
+    //                    this);
+    // System.out.printf("Enter daikon variable tree%n%s%n",
+    //                    traversalEnter.treeString());
 
     traversalExit = RootInfo.exit_process(this, depth);
-
-    if (false) {
-      System.out.printf("Exit daikon variable tree%n%s%n", traversalExit.treeString());
-    }
+    // System.out.printf("Exit daikon variable tree%n%s%n",
+    //                    traversalExit.treeString());
   }
 
   @SideEffectFree
   @Override
   public String toString(@GuardSatisfied MethodInfo this) {
     String out = "";
-    if (class_info != null) {
-      out = class_info.class_name + ".";
-    }
+    if (class_info != null) out = class_info.class_name + ".";
     out += method_name + "(";
     for (int ii = 0; ii < arg_names.length; ii++) {
-      if (ii > 0) {
-        out += ", ";
-      }
+      if (ii > 0) out += ", ";
       out += arg_type_strings[ii] + " " + arg_names[ii];
     }
     return (out + ")");
@@ -248,11 +240,7 @@ public class MethodInfo {
     return isPure;
   }
 
-  /**
-   * Returns the return type of this method, or Void.TYPE for a constructor.
-   *
-   * @return the return type of this method
-   */
+  /** Returns the turn type of the method, or Void.TYPE for a constructor. */
   public Class<?> return_type() {
     if (member instanceof Method) {
       Method m = (Method) member;

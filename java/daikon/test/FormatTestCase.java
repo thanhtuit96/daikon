@@ -4,17 +4,7 @@ import static daikon.inv.Invariant.asInvClass;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
-import daikon.FileIO;
-import daikon.Global;
-import daikon.PptSlice;
-import daikon.PptSlice1;
-import daikon.PptSlice2;
-import daikon.PptSlice3;
-import daikon.PptTopLevel;
-import daikon.ProglangType;
-import daikon.VarComparabilityNone;
-import daikon.VarInfo;
-import daikon.VarInfoAux;
+import daikon.*;
 import daikon.inv.Invariant;
 import daikon.inv.OutputFormat;
 import daikon.inv.binary.BinaryInvariant;
@@ -182,7 +172,6 @@ class FormatTestCase {
       return "";
     }
   }
-
   // End of SingleOutputTestCase
 
   /** Prefix to each goal line in the file for identitication. */
@@ -243,9 +232,7 @@ class FormatTestCase {
               + current.getFormatString()
               + "): "
               + current.createTestOutput(invariantToTest));
-      if (i != testCases.size() - 1) {
-        output.append(lineSep);
-      }
+      if (i != testCases.size() - 1) output.append(lineSep);
       currentLine = currentGoalLineNumber;
     }
 
@@ -253,7 +240,7 @@ class FormatTestCase {
   }
 
   /**
-   * Returns true if all tests on this invariant are passed.
+   * Checks to see whether all tests on this invariant are passed.
    *
    * @return true if all the tests on this invariant passed, false otherwise
    */
@@ -283,9 +270,7 @@ class FormatTestCase {
       result.append(currentDiffString);
       // interned if the empty string, but use .equals to avoid an
       // Interning Checker warning
-      if (i != testCases.size() && !currentDiffString.equals("")) {
-        result.append(lineSep + lineSep);
-      }
+      if (i != testCases.size() && !currentDiffString.equals("")) result.append(lineSep + lineSep);
     }
 
     return result.toString();
@@ -436,9 +421,7 @@ class FormatTestCase {
     // If generating goals get the formats from the list of formats
     if (!generateGoals) {
       goalOutput = parseGoal(getNextRealLine(commands));
-      if (goalOutput == null) {
-        throw new RuntimeException("Bad format of goal data");
-      }
+      if (goalOutput == null) throw new RuntimeException("Bad format of goal data");
     } else {
       formatStrings = InvariantFormatTester.TEST_FORMAT_LIST.iterator();
     }
@@ -904,7 +887,7 @@ class FormatTestCase {
    *     variables involved
    */
   private static void populateWithSamples(Invariant inv, List<Object[]> samples) {
-    if (samples == null || samples.isEmpty()) {
+    if (samples == null || samples.size() == 0) {
       return;
     }
 
@@ -1067,7 +1050,7 @@ class FormatTestCase {
       Method get_proto = theClass.getMethod("get_proto", arg_types);
       @Prototype Invariant proto = (@Prototype Invariant) get_proto.invoke(null, arg_vals);
 
-      return proto.instantiate(slice);
+      return (proto.instantiate(slice));
     } catch (Exception e) {
       e.printStackTrace(System.out);
       throw new RuntimeException(

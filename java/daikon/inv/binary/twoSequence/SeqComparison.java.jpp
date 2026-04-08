@@ -13,7 +13,7 @@ The correct way to build the system is to run 'make'.
   #define PRIMITIVE long
   #define NUMERIC
   #define IS_INT
-  #define ARRAYCOMPARATOR ArraysPlume.LongArrayComparatorLexical.it
+  #define ARRAYCOMPARATOR new ArraysPlume.LongArrayComparatorLexical()
   #define ELEM_MATCH_COMPARE(v1, v2) (ArraysPlume.isSubset(v1, v2) && \
                                       ArraysPlume.isSubset(v2, v1))
   #define SUBSEQUENCE SubSequence
@@ -55,7 +55,7 @@ The correct way to build the system is to run 'make'.
   #define SUPERCLASS TwoSequenceString
   #define PRIMITIVE String
   #define IS_STRING
-  #define ARRAYCOMPARATOR ArraysPlume.StringArrayComparatorLexical.it
+  #define ARRAYCOMPARATOR new ArraysPlume.StringArrayComparatorLexical()
   #define ELEM_MATCH_COMPARE(v1, v2) (ArraysPlume.isSubset(v1, v2) && \
                                       ArraysPlume.isSubset(v2, v1))
   #define SUBSEQUENCE SubSequenceString
@@ -276,6 +276,9 @@ public class SEQSEQINTEQUAL extends SUPERCLASS
   implements EqualityComparison
 #endif
 {
+  // We are Serializable, so we specify a version to allow changes to
+  // method signatures without breaking serialization.  If you add or
+  // remove fields, you should change this number to the current date.
   static final long serialVersionUID = 20030822L;
 
   // Variables starting with dkconfig_ should only be set via the
@@ -290,14 +293,14 @@ public class SEQSEQINTEQUAL extends SUPERCLASS
 
   boolean orderMatters;
 
-  protected SEQSEQINTEQUAL(PptSlice ppt, boolean orderMatters) {
+  protected SEQSEQINTEQUAL(PptSlice ppt, boolean order) {
     super(ppt);
-    this.orderMatters = orderMatters;
+    orderMatters = order;
   }
 
-  protected @Prototype SEQSEQINTEQUAL(boolean orderMatters) {
+  protected @Prototype SEQSEQINTEQUAL(boolean order) {
     super();
-    this.orderMatters = orderMatters;
+    orderMatters = order;
   }
 
   #if !(defined(EQUAL) || defined(EQUALFLOAT) || defined(EQUALSTRING))
@@ -315,11 +318,13 @@ public class SEQSEQINTEQUAL extends SUPERCLASS
     return proto;
   }
 
+  /** Returns whether or not this invariant is enabled. */
   @Override
   public boolean enabled() {
     return dkconfig_enabled;
   }
 
+  /** Non-Equal SeqComparison is only valid on integral types. */
   @Override
   public boolean instantiate_ok(VarInfo[] vis) {
 
@@ -335,10 +340,10 @@ public class SEQSEQINTEQUAL extends SUPERCLASS
 
       // This intentonally checks dimensions(), not pseudoDimensions.
       boolean only_eq =
-        !((type1.dimensions() == 1)
-          && type1.BASE_IS_TYPE
-          && (type2.dimensions() == 1)
-          && type2.BASE_IS_TYPE);
+        (!((type1.dimensions() == 1)
+           && type1.BASE_IS_TYPE
+           && (type2.dimensions() == 1)
+           && type2.BASE_IS_TYPE));
       if (only_eq) {
         return false;
       }
@@ -353,6 +358,7 @@ public class SEQSEQINTEQUAL extends SUPERCLASS
     return true;
   }
 
+  /** Instantiates the invariant on the specified slice. */
   @Override
   protected SEQSEQINTEQUAL instantiate_dyn(@Prototype SEQSEQINTEQUAL this, PptSlice slice) {
     boolean has_order = slice.var_infos[0].aux.hasOrder() && slice.var_infos[1].aux.hasOrder();
@@ -473,8 +479,8 @@ public class SEQSEQINTEQUAL extends SUPERCLASS
   @Override
   public InvariantStatus check_modified(
       PRIMITIVE @Interned [] v1, PRIMITIVE @Interned [] v2, int count) {
-    // // This does not do the right thing; I really want to avoid comparisons
-    // // if one is missing, but not if one is zero-length.
+    /// This does not do the right thing; I really want to avoid comparisons
+    /// if one is missing, but not if one is zero-length.
     // // Don't make comparisons with empty arrays.
     // if ((v1.length == 0) || (v2.length == 0)) {
     //   return;
@@ -779,12 +785,4 @@ public class SEQSEQINTEQUAL extends SUPERCLASS
   #else
     private static @Nullable NISuppressionSet suppressions = null;
   #endif
-
-
-  @Override
-  public @Nullable @NonPrototype SEQSEQINTEQUAL merge(
-      @Prototype SEQSEQINTEQUAL this, List<@NonPrototype Invariant> invs, PptSlice parent_ppt) {
-    // Ignore the orderMatters field, because it is always the same (and is always true).
-    return (SEQSEQINTEQUAL) super.merge(invs, parent_ppt);
-  }
 }

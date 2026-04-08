@@ -1,7 +1,6 @@
 package daikon;
 
 import static daikon.Global.lineSep;
-import static java.util.logging.Level.INFO;
 
 import daikon.inv.Invariant;
 import daikon.inv.InvariantStatus;
@@ -39,11 +38,6 @@ import org.checkerframework.dataflow.qual.Pure;
  */
 @SuppressWarnings("nullness") // not actively maintained
 public class DaikonSimple {
-
-  /** Do not instantiate. */
-  private DaikonSimple() {
-    throw new Error("Do not instantiate");
-  }
 
   // logging information
   public static final Logger debug = Logger.getLogger("daikon.DaikonSimple");
@@ -92,7 +86,7 @@ public class DaikonSimple {
   public static void mainHelper(final String[] args) throws IOException, FileNotFoundException {
 
     // set up logging information
-    daikon.LogHelper.setupLogs(INFO);
+    daikon.LogHelper.setupLogs(daikon.LogHelper.INFO);
 
     // No optimizations used in the simple incremental algorithm so
     // optimizations are turned off.
@@ -113,7 +107,7 @@ public class DaikonSimple {
     Set<File> decls_files = files.decls;
     Set<String> dtrace_files = files.dtrace;
 
-    if (decls_files.isEmpty() && dtrace_files.isEmpty()) {
+    if ((decls_files.size() == 0) && (dtrace_files.size() == 0)) {
       throw new Daikon.UserError("No .decls or .dtrace files specified");
     }
 
@@ -316,8 +310,8 @@ public class DaikonSimple {
   }
 
   /**
-   * Returns true if the specified binary slice should be created. The slice should not be created
-   * if the vars are not compatible.
+   * Returns whether or not the specified binary slice should be created. The slice should not be
+   * created if the vars are not compatible.
    *
    * <p>Since we are trying to create all of the invariants, the variables does not have to be a
    * leader and can be a constant. Note that the always missing check is only applicable when the
@@ -332,8 +326,8 @@ public class DaikonSimple {
   }
 
   /**
-   * Returns true if the specified ternary slice should be created. The slice should not be created
-   * if any of the following are true
+   * Returns whether or not the specified ternary slice should be created. The slice should not be
+   * created if any of the following are true
    *
    * <ul>
    *   <li>Any var is an array
@@ -352,7 +346,7 @@ public class DaikonSimple {
   public static boolean is_slice_ok(VarInfo v1, VarInfo v2, VarInfo v3) {
 
     // Vars must be compatible
-    return v1.compatible(v2) && v1.compatible(v3) && v2.compatible(v3);
+    return (v1.compatible(v2) && v1.compatible(v3) && v2.compatible(v3));
   }
 
   /**
@@ -545,13 +539,9 @@ public class DaikonSimple {
         wait = false;
       }
 
-      if (object_ppt != null) {
-        add(object_ppt, object_vt, nonce);
-      }
+      if (object_ppt != null) add(object_ppt, object_vt, nonce); // apply object vt
 
-      if (class_ppt != null) {
-        add(class_ppt, class_vt, nonce);
-      }
+      if (class_ppt != null) add(class_ppt, class_vt, nonce);
     }
 
     /**
@@ -599,7 +589,7 @@ public class DaikonSimple {
         // DaikonSimple will not do this to be consistent.
         // The better idea is for Daikon to assert that these valuetuples are
         // empty and then skip the sample.
-        assert vt.isEmpty();
+        assert vt.size() == 0;
         return;
       }
 
@@ -650,9 +640,7 @@ public class DaikonSimple {
             for (VarInfo vi : inv.ppt.var_infos) {
               assert vt.getValue(vi) != null : vi;
             }
-            if (inv.ppt instanceof PptSlice2) {
-              assert inv.ppt.var_infos.length == 2;
-            }
+            if (inv.ppt instanceof PptSlice2) assert inv.ppt.var_infos.length == 2;
             InvariantStatus status = inv.add_sample(vt, 1);
             if (status == InvariantStatus.FALSIFIED) {
               k.remove();

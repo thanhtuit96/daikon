@@ -2,8 +2,6 @@ package daikon.chicory;
 
 import static java.lang.System.out;
 
-import java.util.Arrays;
-import java.util.List;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 class ChicoryTest {
@@ -23,17 +21,10 @@ class ChicoryTest {
     double d = t.sample2();
     out.println("sample return [62.4] = " + d);
 
-    List<String> list = Arrays.asList(args);
-    for (String s : list) {
-      out.println("arg: " + s);
-    }
-
-    t.test_array(list);
-
     t.test_d(1.0, 5.0);
   }
 
-  public ChicoryTest @Nullable [] test_array(List<String> list) {
+  public ChicoryTest @Nullable [] test_array() {
     return null;
   }
 

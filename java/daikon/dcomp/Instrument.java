@@ -1,63 +1,47 @@
 package daikon.dcomp;
 
 import daikon.DynComp;
-import daikon.chicory.Runtime;
 import daikon.plumelib.bcelutil.BcelUtil;
 import daikon.plumelib.bcelutil.SimpleLog;
-import daikon.plumelib.reflection.Signatures;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.security.ProtectionDomain;
-import org.apache.bcel.classfile.ClassParser;
-import org.apache.bcel.classfile.JavaClass;
+import org.apache.bcel.*;
+import org.apache.bcel.classfile.*;
+import org.apache.bcel.generic.*;
 import org.checkerframework.checker.nullness.qual.Nullable;
-import org.checkerframework.checker.signature.qual.BinaryName;
 import org.checkerframework.checker.signature.qual.InternalForm;
 import org.checkerframework.dataflow.qual.Pure;
 
-/**
- * This class is responsible for modifying another class's bytecodes. Specifically, its main task is
- * to add calls into the DynComp Runtime for instrumentation purposes. These added calls are
- * sometimes referred to as "hooks".
- *
- * <p>This class is loaded by Premain at startup. It is a ClassFileTransformer which means that its
- * {@code transform} method gets called each time the JVM loads a class.
- */
 public class Instrument implements ClassFileTransformer {
 
   /** Directory for debug output. */
-  final File debug_dir;
-
-  /** Directory into which to dump debug-instrumented classes. */
-  final File debug_instrumented_dir;
-
-  /** Directory into which to dump original classes. */
-  final File debug_uninstrumented_dir;
-
+  File debug_dir;
+  /** Directory for debug instrumented class output. */
+  File debug_bin_dir;
+  /** Directory for debug original class output. */
+  File debug_orig_dir;
   /** Have we seen a class member of a known transformer? */
-  private static boolean transformer_seen = false;
+  static boolean transformer_seen = false;
 
-  /**
-   * Debug information about which classes and/or methods are transformed and why. Use
-   * debugInstrument for actual instrumentation details.
-   */
-  protected static final SimpleLog debug_transform = new SimpleLog(false);
+  /** Debug information about which classes are transformed and why. */
+  private static SimpleLog debug_transform = new SimpleLog(false);
 
-  /** Create an instrumenter. Setup debug directories, if needed. */
+  /** Instrument class constructor. Setup debug directories, if needed. */
   public Instrument() {
     debug_transform.enabled =
-        DynComp.debug || DynComp.debug_transform || Premain.debug_dcinstrument || DynComp.verbose;
-    daikon.chicory.Instrument.debug_ppt_omit.enabled = DynComp.debug;
+        DynComp.debug || DynComp.debug_transform || Premain.debug_dcinstrument;
+    daikon.chicory.Instrument.debug_transform.enabled = debug_transform.enabled;
 
     debug_dir = DynComp.debug_dir;
-    debug_instrumented_dir = new File(debug_dir, "instrumented");
-    debug_uninstrumented_dir = new File(debug_dir, "uninstrumented");
+    debug_bin_dir = new File(debug_dir, "bin");
+    debug_orig_dir = new File(debug_dir, "orig");
 
     if (DynComp.dump) {
-      debug_instrumented_dir.mkdirs();
-      debug_uninstrumented_dir.mkdirs();
+      debug_bin_dir.mkdirs();
+      debug_orig_dir.mkdirs();
     }
   }
 
@@ -73,50 +57,18 @@ public class Instrument implements ClassFileTransformer {
     System.out.println();
   }
 
-  /**
-   * Output a .class file and a .bcel version of the class file.
-   *
-   * @param c the Java class to output
-   * @param directory output location for the files
-   * @param className the current class
-   */
-  private void outputDebugFiles(JavaClass c, File directory, @BinaryName String className) {
-    try {
-      debug_transform.log("Dumping .class and .bcel for %s to %s%n", className, directory);
-      // Write the byte array to a .class file.
-      File outputFile = new File(directory, className + ".class");
-      c.dump(outputFile);
-      // Write a BCEL-like file.
-      BcelUtil.dump(c, directory);
-    } catch (Throwable t) {
-      System.err.printf("Error %s writing debug files for: %s%n", t, className);
-      t.printStackTrace();
-      // ignore the error, it shouldn't affect the instrumentation
-    }
-  }
-
-  /**
-   * Given a class, return a transformed version of the class that contains instrumentation code.
-   * Because DynComp is invoked as a javaagent, the transform method is called by the Java runtime
-   * each time a new class is loaded. A return value of null leaves the byte codes unchanged.
-   *
-   * <p>{@inheritDoc}
-   */
   @Override
+  @SuppressWarnings("nullness") // bug: java.lang.instrument is not yet annotated
   public byte @Nullable [] transform(
-      @Nullable ClassLoader loader,
+      ClassLoader loader,
       @InternalForm String className,
-      @Nullable Class<?> classBeingRedefined,
+      Class<?> classBeingRedefined,
       ProtectionDomain protectionDomain,
       byte[] classfileBuffer)
       throws IllegalClassFormatException {
 
-    // for debugging
-    // new Throwable().printStackTrace();
-
-    debug_transform.log("Entering dcomp.Instrument.transform(): class = %s%n", className);
-
-    @BinaryName String binaryClassName = Signatures.internalFormToBinaryName(className);
+    debug_transform.log(
+        "In dcomp.Instrument.transform(): class = %s, loader: %s%n", className, loader);
 
     if (className == null) {
       /*
@@ -127,9 +79,9 @@ public class Instrument implements ClassFileTransformer {
         JavaClass c = parser.parse();
         System.out.println(c.toString());
       } catch (Throwable e) {
-        System.out.printf("Error: %s%n", e);
+        System.out.printf("Unexpected Error: %s%n", e);
         e.printStackTrace();
-        throw new RuntimeException("Error", e);
+        throw new RuntimeException("Unexpected error", e);
       }
       */
       // most likely a lambda related class
@@ -138,14 +90,14 @@ public class Instrument implements ClassFileTransformer {
 
     // See comments in Premain.java about meaning and use of in_shutdown.
     if (Premain.in_shutdown) {
-      debug_transform.log("Skipping in_shutdown class %s%n", binaryClassName);
+      debug_transform.log("Skipping in_shutdown class %s%n", className);
       return null;
     }
 
     // If already instrumented, nothing to do
-    // (This set will be empty if Premain.jdk_instrumented is false)
+    // (This set will be empty if DCInstrument.jdk_instrumented is false)
     if (Premain.pre_instrumented.contains(className)) {
-      debug_transform.log("Skipping pre_instrumented JDK class %s%n", binaryClassName);
+      debug_transform.log("Skipping pre_instrumented JDK class %s%n", className);
       return null;
     }
 
@@ -154,8 +106,8 @@ public class Instrument implements ClassFileTransformer {
     // Check if class is in JDK
     if (BcelUtil.inJdkInternalform(className)) {
       // If we are not using an instrumented JDK, then skip this class.
-      if (!Premain.jdk_instrumented) {
-        debug_transform.log("Skipping JDK class %s%n", binaryClassName);
+      if (!DCInstrument.jdk_instrumented) {
+        debug_transform.log("Skipping JDK class %s%n", className);
         return null;
       }
 
@@ -168,42 +120,36 @@ public class Instrument implements ClassFileTransformer {
         }
       }
 
-      if (Runtime.isJava9orLater()) {
-        if (Premain.problem_classes.contains(binaryClassName)) {
-          debug_transform.log("Skipping problem class %s%n", binaryClassName);
+      if (BcelUtil.javaVersion > 8) {
+        if (Premain.problem_classes.contains(className.replace('/', '.'))) {
+          debug_transform.log("Skipping problem class %s%n", className);
           return null;
         }
       }
 
-      if (className.contains("/$Proxy")) {
-        debug_transform.log("Skipping proxy class %s%n", binaryClassName);
-        return null;
-      }
-
       if (className.equals("java/lang/DCRuntime")) {
-        debug_transform.log("Skipping special DynComp runtime class %s%n", binaryClassName);
+        debug_transform.log("Skipping special DynComp runtime class %s%n", className);
         return null;
       }
 
       in_jdk = true;
-      debug_transform.log("Instrumenting JDK class %s%n", binaryClassName);
+      debug_transform.log("Instrumenting JDK class %s%n", className);
     } else {
 
       // We're not in a JDK class
       // Don't instrument our own classes
       if (is_dcomp(className)) {
-        debug_transform.log("Skipping is_dcomp class %s%n", binaryClassName);
+        debug_transform.log("Skipping is_dcomp class %s%n", className);
         return null;
       }
 
       // Don't instrument other byte code transformers
       if (is_transformer(className)) {
-        debug_transform.log("Skipping is_transformer class %s%n", binaryClassName);
+        debug_transform.log("Skipping is_transformer class %s%n", className);
         if (!transformer_seen) {
           transformer_seen = true;
           System.err.printf(
-              "DynComp warning: This program uses a Java byte code transformer: %s%n",
-              binaryClassName);
+              "DynComp warning: This program uses a Java byte code transformer: %s%n", className);
           System.err.printf(
               "This may interfere with the DynComp transformer and cause DynComp to fail.%n");
         }
@@ -211,58 +157,48 @@ public class Instrument implements ClassFileTransformer {
       }
     }
 
-    ClassLoader cfLoader;
     if (loader == null) {
-      cfLoader = ClassLoader.getSystemClassLoader();
-      debug_transform.log("Transforming class %s, loader %s - %s%n", className, loader, cfLoader);
+      debug_transform.log("transforming class %s, loader %s%n", className, loader);
     } else {
-      cfLoader = loader;
       debug_transform.log(
-          "Transforming class %s, loader %s - %s%n", className, loader, loader.getParent());
+          "transforming class %s, loader %s - %s%n", className, loader, loader.getParent());
     }
 
-    // Parse the bytes of the classfile, die on any errors.
-    JavaClass c;
-    try (ByteArrayInputStream bais = new ByteArrayInputStream(classfileBuffer)) {
-      ClassParser parser = new ClassParser(bais, className);
-      c = parser.parse();
-    } catch (Throwable t) {
-      System.err.printf("Error %s while reading %s%n", t, binaryClassName);
-      t.printStackTrace();
-      // No changes to the bytecodes
-      return null;
-    }
-
-    if (DynComp.dump) {
-      outputDebugFiles(c, debug_uninstrumented_dir, binaryClassName);
-    }
-
-    // Instrument the classfile, die on any errors
-    JavaClass njc;
     try {
-      DCInstrument dci = new DCInstrument(c, in_jdk, loader);
-      njc = dci.instrument();
-    } catch (Throwable t) {
-      RuntimeException re =
-          new RuntimeException(String.format("Error %s in transform of %s", t, binaryClassName), t);
-      re.printStackTrace();
-      throw re;
-    }
+      // Parse the bytes of the classfile, die on any errors
+      ClassParser parser = new ClassParser(new ByteArrayInputStream(classfileBuffer), className);
+      JavaClass c = parser.parse();
 
-    if (njc != null) {
       if (DynComp.dump) {
-        outputDebugFiles(njc, debug_instrumented_dir, binaryClassName);
+        c.dump(new File(debug_orig_dir, c.getClassName() + ".class"));
       }
-      return njc.getBytes();
-    } else {
-      debug_transform.log("Didn't instrument %s%n", binaryClassName);
-      // No changes to the bytecodes
-      return null;
+
+      // Transform the file
+      DCInstrument dci = new DCInstrument(c, in_jdk, loader);
+      JavaClass njc = dci.instrument();
+
+      if (njc == null) {
+        debug_transform.log("Didn't instrument %s%n", c.getClassName());
+        return null;
+      } else {
+        if (DynComp.dump) {
+          System.out.printf("Dumping %s to %s%n", njc.getClassName(), debug_bin_dir);
+          // write .class file
+          njc.dump(new File(debug_bin_dir, njc.getClassName() + ".class"));
+          // write .bcel file
+          BcelUtil.dump(njc, debug_bin_dir);
+        }
+        return (njc.getBytes());
+      }
+    } catch (Throwable e) {
+      System.err.printf("Unexpected Error: %s%n", e);
+      e.printStackTrace();
+      throw new RuntimeException("Unexpected error", e);
     }
   }
 
   /**
-   * Returns true if the specified class is part of dcomp itself (and thus should not be
+   * Returns whether or not the specified class is part of dcomp itself (and thus should not be
    * instrumented). Some Daikon classes that are used by DynComp are included here as well.
    *
    * @param classname class to be checked
@@ -288,8 +224,8 @@ public class Instrument implements ClassFileTransformer {
   }
 
   /**
-   * Returns true if the specified class is part of a tool known to do Java byte code
-   * transformation. We need to warn the user that this may not work correctly.
+   * Returns whether or not the specified class is part of a tool known to do Java byte code
+   * transformation. We need to warn user this may not work correctly.
    *
    * @param classname class to be checked
    * @return true if classname is a known transformer
@@ -297,12 +233,6 @@ public class Instrument implements ClassFileTransformer {
   @Pure
   protected static boolean is_transformer(String classname) {
 
-    if (classname.startsWith("org/codehaus/groovy")) {
-      return true;
-    }
-    if (classname.startsWith("groovy/lang")) {
-      return true;
-    }
     if (classname.startsWith("org/mockito")) {
       return true;
     }

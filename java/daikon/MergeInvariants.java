@@ -1,12 +1,8 @@
 package daikon;
 
-import static java.util.logging.Level.FINE;
-import static java.util.logging.Level.INFO;
-
 import daikon.split.PptSplitter;
 import daikon.suppress.NIS;
-import gnu.getopt.Getopt;
-import gnu.getopt.LongOpt;
+import gnu.getopt.*;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -17,6 +13,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.plumelib.util.FilesPlume;
@@ -62,10 +59,7 @@ public final class MergeInvariants {
           "      Specify an output inv file.  If not specified, the results are printed");
 
   public static void main(final String[] args)
-      throws FileNotFoundException,
-          StreamCorruptedException,
-          OptionalDataException,
-          IOException,
+      throws FileNotFoundException, StreamCorruptedException, OptionalDataException, IOException,
           ClassNotFoundException {
     try {
       mainHelper(args);
@@ -87,13 +81,10 @@ public final class MergeInvariants {
    */
   @SuppressWarnings("nullness:contracts.precondition") // private field
   public static void mainHelper(String[] args)
-      throws FileNotFoundException,
-          StreamCorruptedException,
-          OptionalDataException,
-          IOException,
+      throws FileNotFoundException, StreamCorruptedException, OptionalDataException, IOException,
           ClassNotFoundException {
 
-    daikon.LogHelper.setupLogs(INFO);
+    daikon.LogHelper.setupLogs(daikon.LogHelper.INFO);
 
     LongOpt[] longopts =
         new LongOpt[] {
@@ -109,7 +100,7 @@ public final class MergeInvariants {
     while ((c = g.getopt()) != -1) {
       switch (c) {
 
-        // long option
+          // long option
         case 0:
           String option_name = longopts[g.getLongind()].getName();
           if (Daikon.help_SWITCH.equals(option_name)) {
@@ -124,9 +115,9 @@ public final class MergeInvariants {
             Global.debugAll = true;
 
           } else if (Daikon.debug_SWITCH.equals(option_name)) {
-            LogHelper.setLevel(Daikon.getOptarg(g), FINE);
+            LogHelper.setLevel(Daikon.getOptarg(g), LogHelper.FINE);
           } else if (Daikon.track_SWITCH.equals(option_name)) {
-            LogHelper.setLevel("daikon.Debug", FINE);
+            LogHelper.setLevel("daikon.Debug", LogHelper.FINE);
             String error = Debug.add_track(Daikon.getOptarg(g));
             if (error != null) {
               throw new Daikon.UserError(
@@ -169,7 +160,7 @@ public final class MergeInvariants {
       }
     }
 
-    daikon.LogHelper.setupLogs(Global.debugAll ? FINE : INFO);
+    daikon.LogHelper.setupLogs(Global.debugAll ? LogHelper.FINE : LogHelper.INFO);
 
     List<File> inv_files = new ArrayList<>();
     File decl_file = null;
@@ -198,9 +189,8 @@ public final class MergeInvariants {
     // Make sure at least two files were specified
     if (inv_files.size() < 2) {
       throw new Daikon.UserError(
-          "Provided "
-              + StringsPlume.nPlural(inv_files.size(), "inv file")
-              + " but needs at least two");
+          "Must specify at least two inv files; only specified "
+              + StringsPlume.nplural(inv_files.size(), "file"));
     }
 
     // Setup the default for guarding
@@ -225,7 +215,7 @@ public final class MergeInvariants {
 
     // if no decls file was specified
     if (decl_file == null) {
-      if (!splitter_files.isEmpty()) {
+      if (splitter_files.size() > 0) {
         throw new Daikon.UserError(".spinfo files may only be specified along with a .decls file");
       }
 
@@ -288,11 +278,11 @@ public final class MergeInvariants {
 
       // Skip everything that is not a final exit point
       if (!ppt.ppt_name.isExitPoint()) {
-        assert !ppt.children.isEmpty() : ppt;
+        assert ppt.children.size() > 0 : ppt;
         continue;
       }
       if (ppt.ppt_name.isCombinedExitPoint()) {
-        assert !ppt.children.isEmpty() : ppt;
+        assert ppt.children.size() > 0 : ppt;
         continue;
       }
 
@@ -304,7 +294,7 @@ public final class MergeInvariants {
         assert ppt.splitters != null; // because ppt.has_splitters() = true
         for (PptSplitter ppt_split : ppt.splitters) {
           for (PptTopLevel p : ppt_split.ppts) {
-            assert p.children.isEmpty() : p;
+            assert p.children.size() == 0 : p;
           }
         }
       }
@@ -356,12 +346,12 @@ public final class MergeInvariants {
       }
 
       // Make sure at least one child was found
-      assert !ppt.children.isEmpty() : ppt;
+      assert ppt.children.size() > 0 : ppt;
       if (ppt.has_splitters()) {
         assert ppt.splitters != null; // because ppt.has_splitters() = true
         for (PptSplitter ppt_split : ppt.splitters) {
           for (PptTopLevel p : ppt_split.ppts) {
-            assert !p.children.isEmpty() : p;
+            assert p.children.size() > 0 : p;
           }
         }
       }
@@ -371,12 +361,10 @@ public final class MergeInvariants {
     merge_ppts.repCheck();
 
     // Debug print the hierarchy is a more readable manner
-    if (debug.isLoggable(FINE)) {
+    if (debug.isLoggable(Level.FINE)) {
       debug.fine("PPT Hierarchy");
       for (PptTopLevel ppt : merge_ppts.pptIterable()) {
-        if (ppt.parents.isEmpty()) {
-          ppt.debug_print_tree(debug, 0, null);
-        }
+        if (ppt.parents.size() == 0) ppt.debug_print_tree(debug, 0, null);
       }
     }
 
@@ -395,9 +383,7 @@ public final class MergeInvariants {
     // System.out.println("Creating implications ");
     debugProgress.fine("Adding Implications ... ");
     for (PptTopLevel ppt : merge_ppts.pptIterable()) {
-      if (ppt.num_samples() > 0) {
-        ppt.addImplications();
-      }
+      if (ppt.num_samples() > 0) ppt.addImplications();
     }
     long duration = System.nanoTime() - startTime;
     debugProgress.fine("Time spent in implications: " + TimeUnit.NANOSECONDS.toSeconds(duration));

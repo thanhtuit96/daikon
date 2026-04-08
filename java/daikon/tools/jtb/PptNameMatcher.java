@@ -9,7 +9,6 @@ import jtb.syntaxtree.*;
 import jtb.visitor.*;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
-import org.checkerframework.checker.signature.qual.Identifier;
 
 /**
  * Matches program point names with their corresponding MethodDeclaration's (or
@@ -127,9 +126,7 @@ public class PptNameMatcher {
       }
     }
 
-    if (debug_getMatches) {
-      System.out.println("getMatchesInternal => " + result);
-    }
+    if (debug_getMatches) System.out.println("getMatchesInternal => " + result);
     return result;
   }
 
@@ -143,7 +140,7 @@ public class PptNameMatcher {
     // 3. method parameters
 
     String classname;
-    @Identifier String methodname;
+    String methodname;
     List<FormalParameter> params;
 
     if (methodOrConstructorDeclaration instanceof MethodDeclaration) {
@@ -152,9 +149,7 @@ public class PptNameMatcher {
       params = Ast.getParameters((MethodDeclaration) methodOrConstructorDeclaration);
     } else if (methodOrConstructorDeclaration instanceof ConstructorDeclaration) {
       classname = Ast.getClassName((ConstructorDeclaration) methodOrConstructorDeclaration);
-      @SuppressWarnings("signature:assignment") // there should be a @MethodName qualifier
-      @Identifier String initMethodName = "<init>";
-      methodname = initMethodName;
+      methodname = "<init>";
       params = Ast.getParameters((ConstructorDeclaration) methodOrConstructorDeclaration);
     } else {
       throw new Error(
@@ -162,9 +157,7 @@ public class PptNameMatcher {
               + methodOrConstructorDeclaration);
     }
 
-    if (debug_getMatches) {
-      System.out.printf("getMatches(%s, %s, ...)%n", classname, methodname);
-    }
+    if (debug_getMatches) System.out.printf("getMatches(%s, %s, ...)%n", classname, methodname);
     if (methodname.equals("<init>")) {
       methodname = simpleName(classname);
       if (debug_getMatches) {
@@ -269,7 +262,7 @@ public class PptNameMatcher {
       if (!typeMatch(pptTypeString, astType)) {
         return false;
       } else {
-        // continue;
+        continue;
       }
     }
 
@@ -278,9 +271,7 @@ public class PptNameMatcher {
 
   public boolean typeMatch(String pptTypeString, FormalParameter astFormalParameter) {
 
-    if (debug_getMatches) {
-      System.out.println(Ast.formatEntireTree(astFormalParameter));
-    }
+    if (debug_getMatches) System.out.println(Ast.formatEntireTree(astFormalParameter));
 
     String astTypeString = getUngenerifiedType(astFormalParameter);
 
@@ -289,16 +280,12 @@ public class PptNameMatcher {
     }
 
     if (Ast.typeMatch(pptTypeString, astTypeString)) {
-      if (debug_getMatches) {
-        System.out.println("Match arg: " + pptTypeString + " " + astTypeString);
-      }
+      if (debug_getMatches) System.out.println("Match arg: " + pptTypeString + " " + astTypeString);
       return true;
     }
 
     if ((pptTypeString != null) && Ast.typeMatch(pptTypeString, astTypeString)) {
-      if (debug_getMatches) {
-        System.out.println("Match arg: " + pptTypeString + " " + astTypeString);
-      }
+      if (debug_getMatches) System.out.println("Match arg: " + pptTypeString + " " + astTypeString);
       return true;
     }
 
@@ -347,8 +334,7 @@ public class PptNameMatcher {
    * Returns the simple name of a possibly-fully-qualified class name. The argument can be a
    * fully-qualified name or a binary name.
    */
-  @SuppressWarnings("signature:return") // string manipulation
-  private static @Identifier String simpleName(String classname) {
+  private static String simpleName(String classname) {
     int dotpos = classname.lastIndexOf('.');
     int dollarpos = classname.lastIndexOf('$');
     int pos = Math.max(dotpos, dollarpos);

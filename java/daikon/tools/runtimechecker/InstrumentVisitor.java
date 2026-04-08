@@ -24,7 +24,6 @@ import jtb.visitor.TreeDumper;
 import jtb.visitor.TreeFormatter;
 import org.checkerframework.checker.nullness.qual.KeyFor;
 import org.checkerframework.checker.nullness.qual.NonNull;
-import org.checkerframework.checker.signature.qual.Identifier;
 import org.plumelib.util.StringsPlume;
 
 /**
@@ -504,7 +503,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
             Ast.create(
                 "ClassOrInterfaceBodyDeclaration",
                 new Class[] {Boolean.TYPE},
-                new Object[] {false}, // isInterface == false
+                new Object[] {Boolean.FALSE}, // isInterface == false
                 modifiers_declaration_stringbuffer.toString());
     Ast.addDeclaration(c, d);
     NodeSequence ns = (NodeSequence) d.f0.choice;
@@ -630,7 +629,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
         Ast.create(
             "ClassOrInterfaceBodyDeclaration",
             new Class[] {Boolean.TYPE},
-            new Object[] {false}, // isInterface == false
+            new Object[] {Boolean.FALSE}, // isInterface == false
             "public static boolean isDaikonInstrumented() { return true; }");
   }
 
@@ -643,7 +642,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
         Ast.create(
             "ClassOrInterfaceBodyDeclaration",
             new Class[] {Boolean.TYPE},
-            new Object[] {false}, // isInterface == false
+            new Object[] {Boolean.FALSE}, // isInterface == false
             code.toString());
   }
 
@@ -655,7 +654,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
         Ast.create(
             "ClassOrInterfaceBodyDeclaration",
             new Class[] {Boolean.TYPE},
-            new Object[] {false}, // isInterface == false
+            new Object[] {Boolean.FALSE}, // isInterface == false
             code.toString());
   }
 
@@ -690,7 +689,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
         Ast.create(
             "ClassOrInterfaceBodyDeclaration",
             new Class[] {Boolean.TYPE},
-            new Object[] {false}, // isInterface == false
+            new Object[] {Boolean.FALSE}, // isInterface == false
             code.toString());
   }
 
@@ -712,7 +711,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
         Ast.create(
             "ClassOrInterfaceBodyDeclaration",
             new Class[] {Boolean.TYPE},
-            new Object[] {false}, // isInterface == false
+            new Object[] {Boolean.FALSE}, // isInterface == false
             code.toString());
   }
 
@@ -733,7 +732,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
         Ast.create(
             "ClassOrInterfaceBodyDeclaration",
             new Class[] {Boolean.TYPE},
-            new Object[] {false}, // isInterface == false
+            new Object[] {Boolean.FALSE}, // isInterface == false
             code.toString());
   }
 
@@ -782,11 +781,8 @@ public class InstrumentVisitor extends DepthFirstVisitor {
   }
 
   /**
-   * Returns a subset of the argument list, removing invariants that do not have a properly
+   * Return a subset of the argument list, removing invariants that do not have a properly
    * implemented Java format.
-   *
-   * @param invariants a list of invariants
-   * @return a new list that is a subset of the argument list
    */
   private static List<Invariant> filterInvariants(List<Invariant> invariants) {
     List<Invariant> survivors = new ArrayList<>();
@@ -929,7 +925,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
   private StringBuilder checkPreconditions_checker_method(
       List<PptTopLevel> matching_ppts,
       PptMap pptmap,
-      @Identifier String methodName,
+      String methodName,
       List<String> parameters,
       boolean majorProperties) {
 
@@ -941,7 +937,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
             + methodName
             + "("
             + "Object thiz"
-            + (!parameters.isEmpty() ? ", " : "")
+            + (parameters.size() > 0 ? ", " : "")
             + String.join(", ", parameters)
             + ") {");
 
@@ -965,7 +961,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
   private StringBuilder checkPostconditions_checker_method(
       List<PptTopLevel> matching_ppts,
       PptMap pptmap,
-      @Identifier String methodName,
+      String methodName,
       String returnType,
       List<String> parameters,
       boolean majorProperties) {
@@ -979,7 +975,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
             + "("
             + "Object thiz "
             + (returnType.equals("void") ? "" : ", " + returnType + " checker_returnval")
-            + (!parameters.isEmpty() ? ", " : "")
+            + (parameters.size() > 0 ? ", " : "")
             + String.join(", ", parameters)
             + ") {");
 
@@ -1003,7 +999,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
   private StringBuilder checkPreconditions_checker_constructor(
       List<PptTopLevel> matching_ppts,
       PptMap pptmap,
-      @Identifier String methodName,
+      String methodName,
       List<String> parameters,
       boolean majorProperties) {
 
@@ -1037,7 +1033,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
   private StringBuilder checkPostconditions_checker_constructor(
       List<PptTopLevel> matching_ppts,
       PptMap pptmap,
-      @Identifier String methodName,
+      String methodName,
       List<String> parameters,
       boolean majorProperties) {
 
@@ -1049,7 +1045,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
             + methodName
             + "("
             + "Object thiz "
-            + (!parameters.isEmpty() ? ", " : "")
+            + (parameters.size() > 0 ? ", " : "")
             + String.join(", ", parameters)
             + ") {");
 
@@ -1077,7 +1073,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
 
     String javarep = inv.format_using(OutputFormat.JAVA);
 
-    if (daikonrep.indexOf('\"') != -1 || daikonrep.indexOf('\\') != -1) {
+    if (daikonrep.indexOf("\"") != -1 || daikonrep.indexOf("\\") != -1) {
       // Now comes some real ugliness: [[ ... ]] It's easier to do
       // this transformation on a character list than by pattern
       // matching against a String.
@@ -1114,13 +1110,13 @@ public class InstrumentVisitor extends DepthFirstVisitor {
 
   /** A pair consisting of an Invariant and its corresponding Property. */
   private static class InvProp {
-    InvProp(Invariant inv, Property p) {
+    public InvProp(Invariant inv, Property p) {
       this.invariant = inv;
       this.property = p;
     }
 
-    Invariant invariant;
-    Property property;
+    public Invariant invariant;
+    public Property property;
   }
 
   /**
@@ -1213,7 +1209,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
               + m.getName()
               + "("
               + "Object thiz"
-              + (!parameters.isEmpty() ? ", " : "")
+              + (parameters.size() > 0 ? ", " : "")
               + String.join(", ", parameters)
               + ") { /* no properties for this member */ }");
 
@@ -1227,7 +1223,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
               + (m.getReturnType().equals(Void.TYPE)
                   ? ""
                   : (", " + Ast.classnameForSourceOutput(m.getReturnType()) + " checker_returnval"))
-              + (!parameters.isEmpty() ? ", " : "")
+              + (parameters.size() > 0 ? ", " : "")
               + String.join(", ", parameters)
               + ") { /* no properties for this member */ }");
     }
@@ -1271,7 +1267,7 @@ public class InstrumentVisitor extends DepthFirstVisitor {
               + baseClassName
               + "("
               + "Object thiz "
-              + (!parameters.isEmpty() ? ", " : "")
+              + (parameters.size() > 0 ? ", " : "")
               + String.join(", ", parameters)
               + ") { /* no properties for this member */ }");
     }

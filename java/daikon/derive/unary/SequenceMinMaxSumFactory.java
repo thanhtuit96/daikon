@@ -22,9 +22,8 @@ public final class SequenceMinMaxSumFactory extends UnaryDerivationFactory {
     if (!vi.type.elementIsIntegral() && !vi.type.elementIsFloat()) {
       return null;
     }
-    if (vi.type.base() == "char") { // interned
-      return null;
-    }
+    if (vi.type.base() == "char") // interned
+    return null;
     // Should be reversed at some point; for now, will improve run time.
     if (Daikon.output_format != OutputFormat.DAIKON) {
       return null;
@@ -41,10 +40,10 @@ public final class SequenceMinMaxSumFactory extends UnaryDerivationFactory {
       result.add(new SequenceSum(vi));
     }
 
-    if (result.isEmpty()) {
+    if (result.size() == 0) {
       return null;
     }
 
-    return result.toArray(new UnaryDerivation[0]);
+    return result.toArray(new UnaryDerivation[result.size()]);
   }
 }

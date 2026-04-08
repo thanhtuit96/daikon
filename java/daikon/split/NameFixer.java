@@ -4,9 +4,8 @@ import daikon.Global;
 import daikon.VarInfo;
 import daikon.tools.jtb.Ast;
 import jtb.ParseException;
-import jtb.syntaxtree.Node;
-import jtb.syntaxtree.NodeToken;
-import jtb.visitor.DepthFirstVisitor;
+import jtb.syntaxtree.*;
+import jtb.visitor.*;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /**
@@ -23,7 +22,6 @@ class NameFixer extends DepthFirstVisitor {
 
   private int columnshift = 0;
   private int columnshiftline = -1;
-
   // column shifting only applies to a single line, then is turned off again.
   // States for the variables:
   // columnshift == 0, columnshiftline == -1:

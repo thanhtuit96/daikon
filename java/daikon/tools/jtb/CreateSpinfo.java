@@ -1,8 +1,6 @@
 package daikon.tools.jtb;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.logging.Level.FINE;
-import static java.util.logging.Level.INFO;
 
 import daikon.*;
 import gnu.getopt.*;
@@ -21,7 +19,6 @@ import jtb.syntaxtree.*;
 import org.checkerframework.checker.nullness.qual.KeyFor;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.plumelib.util.CollectionsPlume;
-import org.plumelib.util.MapsP;
 import org.plumelib.util.StringsPlume;
 
 /**
@@ -47,11 +44,6 @@ public class CreateSpinfo {
   //
   //  The method printSpinfoFile prints out these expressions and
   //  replace statements in splitter info file format.
-
-  /** Do not instantiate. */
-  private CreateSpinfo() {
-    throw new Error("Do not instantiate");
-  }
 
   /** Debug logger. */
   public static final Logger debug = Logger.getLogger("daikon.tools.jtb.CreateSpinfo");
@@ -80,7 +72,7 @@ public class CreateSpinfo {
     // If not set, put output in files named after the input (source) files.
     String outputfilename = null;
 
-    daikon.LogHelper.setupLogs(INFO);
+    daikon.LogHelper.setupLogs(daikon.LogHelper.INFO);
     LongOpt[] longopts =
         new LongOpt[] {
           new LongOpt(Daikon.help_SWITCH, LongOpt.NO_ARGUMENT, null, 0),
@@ -101,7 +93,7 @@ public class CreateSpinfo {
           } else if (Daikon.debugAll_SWITCH.equals(option_name)) {
             Global.debugAll = true;
           } else if (Daikon.debug_SWITCH.equals(option_name)) {
-            daikon.LogHelper.setLevel(Daikon.getOptarg(g), FINE);
+            LogHelper.setLevel(Daikon.getOptarg(g), LogHelper.FINE);
           } else {
             throw new RuntimeException("Unknown long option received: " + option_name);
           }
@@ -127,23 +119,23 @@ public class CreateSpinfo {
           "Error: No .java file arguments supplied." + Global.lineSep + usage);
     }
     if (outputfilename != null) {
-      try (PrintWriter output =
-          new PrintWriter(Files.newBufferedWriter(Paths.get(outputfilename), UTF_8))) {
-        for (; argindex < args.length; argindex++) {
-          String javaFileName = args[argindex];
-          writeSplitters(javaFileName, output);
-        }
-        output.flush();
+      PrintWriter output =
+          new PrintWriter(Files.newBufferedWriter(Paths.get(outputfilename), UTF_8));
+      for (; argindex < args.length; argindex++) {
+        String javaFileName = args[argindex];
+        writeSplitters(javaFileName, output);
       }
+      output.flush();
+      output.close();
     } else {
       for (; argindex < args.length; argindex++) {
         String javaFileName = args[argindex];
         String spinfoFileName = spinfoFileName(javaFileName);
-        try (PrintWriter output =
-            new PrintWriter(Files.newBufferedWriter(Paths.get(spinfoFileName), UTF_8))) {
-          writeSplitters(javaFileName, output);
-          output.flush();
-        }
+        PrintWriter output =
+            new PrintWriter(Files.newBufferedWriter(Paths.get(spinfoFileName), UTF_8));
+        writeSplitters(javaFileName, output);
+        output.flush();
+        output.close();
       }
     }
   }
@@ -163,7 +155,7 @@ public class CreateSpinfo {
         "Warning: CreateSpinfo input file " + javaFileName + "does not end in .java.");
 
     // change the file extension to .spinfo
-    int dotPos = javaFileName.indexOf('.');
+    int dotPos = javaFileName.indexOf(".");
     if (dotPos == -1) {
       return javaFileName + ".spinfo";
     } else {
@@ -176,12 +168,12 @@ public class CreateSpinfo {
    *
    * @param javaFileName the name of the java file from which this spinfo file is being made
    * @param output the PrintWriter to which this spinfo file is being wrote
-   * @throws IOException if there is a problem reading or writing files
    */
   private static void writeSplitters(String javaFileName, PrintWriter output) throws IOException {
+    Reader input = Files.newBufferedReader(Paths.get(javaFileName), UTF_8);
+    JavaParser parser = new JavaParser(input);
     Node root;
-    try (Reader input = Files.newBufferedReader(Paths.get(javaFileName), UTF_8)) {
-      JavaParser parser = new JavaParser(input);
+    try {
       root = parser.CompilationUnit();
     } catch (ParseException e) {
       e.printStackTrace();
@@ -253,17 +245,17 @@ public class CreateSpinfo {
     if (!replaceStatements.values().isEmpty()) {
       output.println("REPLACE");
       for (
-      @KeyFor("replaceStatements") String declaration : MapsP.sortedKeySet(replaceStatements)) {
+      @KeyFor("replaceStatements") String declaration : CollectionsPlume.sortedKeySet(replaceStatements)) {
         output.println(declaration);
         String replacement = replaceStatements.get(declaration);
         output.println(removeNewlines(replacement));
       }
       output.println();
     }
-    for (@KeyFor("conditions") String method : MapsP.sortedKeySet(conditions)) {
+    for (@KeyFor("conditions") String method : CollectionsPlume.sortedKeySet(conditions)) {
       List<String> method_conds = conditions.get(method);
       Collections.sort(method_conds);
-      if (!method_conds.isEmpty()) {
+      if (method_conds.size() > 0) {
         String qualifiedMethod = (packageName == null) ? method : packageName + "." + method;
         output.println("PPT_NAME " + qualifiedMethod);
         for (int i = 0; i < method_conds.size(); i++) {

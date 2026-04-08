@@ -56,6 +56,9 @@ import typequals.prototype.qual.Prototype;
  * z}.
  */
 public final /*(at)Interned*/ class Equality extends Invariant {
+  // We are Serializable, so we specify a version to allow changes to
+  // method signatures without breaking serialization.  If you add or
+  // remove fields, you should change this number to the current date.
   static final long serialVersionUID = 20021231L;
 
   public static final Logger debug = Logger.getLogger("daikon.inv.Equality");
@@ -108,8 +111,8 @@ public final /*(at)Interned*/ class Equality extends Invariant {
     vars.addAll(variables);
     VarInfo leader = leader();
 
-    // Ensure well-formedness and set equality slots.
-    assert !variables.isEmpty();
+    // ensure well-formedness and set equality slots
+    assert variables.size() > 0;
     assert vars.size() == variables.size();
 
     for (VarInfo vi : variables) {
@@ -125,13 +128,12 @@ public final /*(at)Interned*/ class Equality extends Invariant {
     }
   }
 
-  // ////////////////////////
+  ////////////////////////
   // Accessors
 
   private @Nullable VarInfo leaderCache = null;
-
   /**
-   * Returns the canonical VarInfo of this. Note that the leader never changes.
+   * Return the canonical VarInfo of this. Note that the leader never changes.
    *
    * @return the canonical VarInfo of this
    */
@@ -157,7 +159,7 @@ public final /*(at)Interned*/ class Equality extends Invariant {
     return Invariant.CONFIDENCE_JUSTIFIED;
   }
 
-  // ////////////////////////
+  ////////////////////////
   // Printing
 
   // The format methods aren't called, because for output, we
@@ -214,9 +216,7 @@ public final /*(at)Interned*/ class Equality extends Invariant {
       result.append(var.name());
       result.append("[" + var.varinfo_index + "]");
       // result.append("[" + var.comparability + "]");
-      if (var == leader()) {
-        result.append("L");
-      }
+      if (var == leader()) result.append("L");
     }
     return result.toString();
   }
@@ -254,10 +254,10 @@ public final /*(at)Interned*/ class Equality extends Invariant {
     }
     // Choose a leader, preferring the valid variables.
     VarInfo leader;
-    if (!valid_equiv.isEmpty()) {
+    if (valid_equiv.size() > 0) {
       leader = valid_equiv.get(0);
     } else {
-      assert !invalid_equiv.isEmpty();
+      assert invalid_equiv.size() > 0;
       leader = invalid_equiv.get(0);
     }
     // Print the equality statements, stating expressible ones first.
@@ -378,11 +378,11 @@ public final /*(at)Interned*/ class Equality extends Invariant {
     return repr();
   }
 
-  // //////////////////////////////////////////////////////////////////////
-  // Processing of data
+  //////////////////////////////////////////////////////////////////////
+  /// Processing of data
 
   /**
-   * Returns a List of VarInfos that do not fit into this set anymore.
+   * Return a List of VarInfos that do not fit into this set anymore.
    *
    * <p>Originally (8/14/2003), this did not check for the modified bits. It seems however, quite
    * wrong to leave variables in the same equality set when one is missing and the other is not.
@@ -484,10 +484,7 @@ public final /*(at)Interned*/ class Equality extends Invariant {
    * invariant as well since that invariant is used in suppressions and obvious tests.
    */
   public void postProcess() {
-    if (this.numSamples() == 0) {
-      // All were missing or not present
-      return;
-    }
+    if (this.numSamples() == 0) return; // All were missing or not present
     PptTopLevel parent = this.ppt.parent;
     VarInfo[] varArray = this.vars.toArray(new VarInfo[0]);
     if (debugPostProcess.isLoggable(Level.FINE)) {
@@ -595,11 +592,5 @@ public final /*(at)Interned*/ class Equality extends Invariant {
   @Override
   protected @NonPrototype Equality instantiate_dyn(@Prototype Equality this, PptSlice slice) {
     throw new Error("do not invoke " + getClass() + ".instantiate_dyn()");
-  }
-
-  @Override
-  public @Nullable @NonPrototype Equality merge(
-      @Prototype Equality this, List<@NonPrototype Invariant> invs, PptSlice parent_ppt) {
-    throw new Error("Don't merge Equality invariants");
   }
 }

@@ -26,21 +26,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
-import org.checkerframework.checker.index.qual.IndexOrHigh;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.lock.qual.GuardedBy;
 import org.checkerframework.checker.lock.qual.Holding;
-import org.checkerframework.checker.mustcall.qual.Owning;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.checker.signature.qual.BinaryName;
 import org.checkerframework.checker.signature.qual.ClassGetName;
 import org.checkerframework.checker.signature.qual.FieldDescriptor;
-import org.checkerframework.checker.signature.qual.FqBinaryName;
 import org.checkerframework.dataflow.qual.SideEffectFree;
 
 /**
@@ -50,11 +46,11 @@ import org.checkerframework.dataflow.qual.SideEffectFree;
 @SuppressWarnings({
   "JavaLangClash" // same class name as one in java.lang.
 })
-public final class Runtime {
+public class Runtime {
   /** Unique id for method entry/exit (so they can be matched up) */
   public static AtomicInteger nonce = new AtomicInteger();
 
-  /** debug flag. */
+  /** debug flag */
   public static boolean debug = false;
 
   /**
@@ -108,7 +104,7 @@ public final class Runtime {
       "nullness:initialization.static.field.uninitialized" // initialized and used in generated
   // instrumentation code that cannot be type-checked by a source code checker.
   )
-  static @Owning @GuardedBy("<self>") PrintWriter dtrace;
+  static @GuardedBy("<self>") PrintWriter dtrace;
 
   /** Set to true when the dtrace stream is closed. */
   static boolean dtrace_closed = false;
@@ -138,14 +134,13 @@ public final class Runtime {
 
   /** Class of information about each active call. */
   private static class CallInfo {
-    /** nonce of call. */
+    /** nonce of call */
     int nonce;
-
-    /** whether or not the call was captured on enter. */
+    /** whether or not the call was captured on enter */
     boolean captured;
 
     @Holding("Runtime.class")
-    CallInfo(int nonce, boolean captured) {
+    public CallInfo(int nonce, boolean captured) {
       this.nonce = nonce;
       this.captured = captured;
     }
@@ -410,7 +405,7 @@ public final class Runtime {
   }
 
   /**
-   * Returns true iff the class with fully qualified name className has been initialized.
+   * Return true iff the class with fully qualified name className has been initialized.
    *
    * @param className fully qualified class name
    */
@@ -433,7 +428,7 @@ public final class Runtime {
       // Get the first class in the list (if any)
       ClassInfo class_info = null;
       synchronized (SharedData.new_classes) {
-        if (!SharedData.new_classes.isEmpty()) {
+        if (SharedData.new_classes.size() > 0) {
           class_info = SharedData.new_classes.removeFirst();
         }
       }
@@ -441,9 +436,7 @@ public final class Runtime {
         break;
       }
 
-      if (debug) {
-        System.out.println("processing class " + class_info.class_name);
-      }
+      if (debug) System.out.println("processing class " + class_info.class_name);
       if (first_class) {
         decl_writer.printHeaderInfo(class_info.class_name);
         first_class = false;
@@ -566,7 +559,7 @@ public final class Runtime {
    * Specify the dtrace file to which to write.
    *
    * @param filename to use as the data trace file
-   * @param append if true, open dtrace file in append mode
+   * @param append whether to open dtrace file in append mode
    */
   @EnsuresNonNull("dtrace")
   public static void setDtrace(String filename, boolean append) {
@@ -577,14 +570,11 @@ public final class Runtime {
     if (no_dtrace) {
       throw new Error("setDtrace called when no_dtrace was specified");
     }
-    File file = new File(filename);
-    File parent = file.getParentFile();
-    if (parent != null) {
-      parent.mkdirs();
-    }
-    OutputStream os = null; // dummy initialization for compiler's definite assignment check
     try {
-      os = new FileOutputStream(filename, append);
+      File file = new File(filename);
+      File parent = file.getParentFile();
+      if (parent != null) parent.mkdirs();
+      OutputStream os = new FileOutputStream(filename, append);
       if (filename.endsWith(".gz")) {
         if (append) {
           throw new Error(
@@ -603,13 +593,6 @@ public final class Runtime {
       BufferedOutputStream bos = new BufferedOutputStream(os, 8192);
       dtrace = new PrintWriter(new BufferedWriter(new OutputStreamWriter(bos, UTF_8)));
     } catch (Exception e) {
-      if (os != null) {
-        try {
-          os.close();
-        } catch (IOException e2) {
-          // do nothing, Exception `e` will be thrown below
-        }
-      }
       e.printStackTrace();
       throw new Error(e);
     }
@@ -682,7 +665,7 @@ public final class Runtime {
 
                 if (chicoryLoaderInstantiationError) {
                   // Warning messages have already been printed.
-                } else if (SharedData.all_classes.isEmpty()) {
+                } else if (SharedData.all_classes.size() == 0) {
                   System.out.println("Chicory warning: No methods were instrumented.");
                   if (!ppt_select_pattern.isEmpty() || !ppt_omit_pattern.isEmpty()) {
                     System.out.println(
@@ -724,12 +707,11 @@ public final class Runtime {
     return null;
   }
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // Wrappers for the various primitive types.
-  // Used to distinguish wrappers created by user code
-  // from wrappers created by Chicory.
+  ///////////////////////////////////////////////////////////////////////////
+  /// Wrappers for the various primitive types.
+  /// Used to distinguish wrappers created by user code
+  /// from wrappers created by Chicory.
 
-  /** A wrapper for a pritive class. */
   public static interface PrimitiveWrapper {
     // returns corresponding java.lang wrapper
     public Object getJavaWrapper();
@@ -737,7 +719,7 @@ public final class Runtime {
     public Class<?> primitiveClass();
   }
 
-  /** wrapper used for boolean arguments. */
+  /** wrapper used for boolean arguments */
   public static class BooleanWrap implements PrimitiveWrapper {
     boolean val;
 
@@ -762,7 +744,7 @@ public final class Runtime {
     }
   }
 
-  /** wrapper used for int arguments. */
+  /** wrapper used for int arguments */
   public static class ByteWrap implements PrimitiveWrapper {
     byte val;
 
@@ -787,14 +769,13 @@ public final class Runtime {
     }
   }
 
-  /** wrapper used for int arguments. */
+  /** wrapper used for int arguments */
   public static class CharWrap implements PrimitiveWrapper {
     char val;
 
     public CharWrap(char val) {
       this.val = val;
     }
-
     // Print characters as integers.
     @SideEffectFree
     @Override
@@ -813,7 +794,7 @@ public final class Runtime {
     }
   }
 
-  /** wrapper used for int arguments. */
+  /** wrapper used for int arguments */
   public static class FloatWrap implements PrimitiveWrapper {
     float val;
 
@@ -838,7 +819,7 @@ public final class Runtime {
     }
   }
 
-  /** wrapper used for int arguments. */
+  /** wrapper used for int arguments */
   public static class IntWrap implements PrimitiveWrapper {
     int val;
 
@@ -863,7 +844,7 @@ public final class Runtime {
     }
   }
 
-  /** wrapper used for int arguments. */
+  /** wrapper used for int arguments */
   public static class LongWrap implements PrimitiveWrapper {
     long val;
 
@@ -888,7 +869,7 @@ public final class Runtime {
     }
   }
 
-  /** wrapper used for int arguments. */
+  /** wrapper used for int arguments */
   public static class ShortWrap implements PrimitiveWrapper {
     short val;
 
@@ -913,7 +894,7 @@ public final class Runtime {
     }
   }
 
-  /** Wrapper used for double arguments. */
+  /** wrapper used for double arguments */
   public static class DoubleWrap implements PrimitiveWrapper {
     double val;
 
@@ -938,241 +919,136 @@ public final class Runtime {
     }
   }
 
-  /** True if the running JVM is for Java 9 or later. */
-  private static final boolean isJava9orLater =
-      !System.getProperty("java.version").startsWith("1.");
+  ///////////////////////////////////////////////////////////////////////////
+  /// Copied code
+  ///
 
-  /**
-   * Returns true if the running JVM is for Java 9 or later.
-   *
-   * @return true if the running JVM is for Java 9 or later
-   */
-  public static boolean isJava9orLater() {
-    return isJava9orLater;
-  }
-
-  /** True if the running JVM is for Java 24 or later. */
-  private static final boolean isJava24orLater =
-      !System.getProperty("java.version").startsWith("1.")
-          && !System.getProperty("java.version").startsWith("9.")
-          && Integer.parseInt(System.getProperty("java.version").substring(0, 2)) >= 24;
-
-  /**
-   * Returns true if the running JVM is for Java 24 or later.
-   *
-   * @return true if the running JVM is for Java 24 or later
-   */
-  public static boolean isJava24orLater() {
-    return isJava24orLater;
-  }
-
-  // ///////////////////////////////////////////////////////////////////////////
-  // Copied code
-  //
-
-  // This code is copied from elsewhere to make this class self-contained.
-
-  //
-  // From class StringsPlume
-  //
-
-  /**
-   * Escapes a String so that it is expressible in a string literal in Java source code. By
-   * surrounding the return value with double quote marks, the result will be a Java string literal
-   * denoting the original string.
-   *
-   * <p>Returns a new string only if any modifications were necessary.
-   *
-   * <p>Compared to the `escapeJava` method in Apache Commons Text StringEscapeUtils, this one
-   * correctly handles non-printable ASCII characters.
-   *
-   * @param orig string to quote
-   * @return quoted version of orig
-   */
-  @SideEffectFree
-  public static String escapeJava(String orig) {
+  // Lifted directly from plume/UtilPlume.java, where it is called
+  // escapeJava(), but repeated here to make this class self-contained.
+  /** Quote \, ", \n, and \r characters in the target; return a new string. */
+  public static String quote(String orig) {
     StringBuilder sb = new StringBuilder();
-    // The previous escape character was seen right before this position.
-    @IndexOrHigh("orig") int postEsc = 0;
-    int origLen = orig.length();
-    for (int i = 0; i < origLen; i++) {
+    // The previous escape (or escaped) character was seen right before
+    // this position.  Alternately:  from this character forward, the string
+    // should be copied out verbatim (until the next escaped character).
+    int post_esc = 0;
+    int orig_len = orig.length();
+    for (int i = 0; i < orig_len; i++) {
       char c = orig.charAt(i);
       switch (c) {
         case '\"':
-          if (postEsc < i) {
-            sb.append(orig.substring(postEsc, i));
-          }
-          sb.append("\\\"");
-          postEsc = i + 1;
-          break;
         case '\\':
-          if (postEsc < i) {
-            sb.append(orig.substring(postEsc, i));
+          if (post_esc < i) {
+            sb.append(orig.substring(post_esc, i));
           }
-          sb.append("\\\\");
-          postEsc = i + 1;
-          break;
-        case '\b':
-          if (postEsc < i) {
-            sb.append(orig.substring(postEsc, i));
-          }
-          sb.append("\\b");
-          postEsc = i + 1;
-          break;
-        case '\f':
-          if (postEsc < i) {
-            sb.append(orig.substring(postEsc, i));
-          }
-          sb.append("\\f");
-          postEsc = i + 1;
+          sb.append('\\');
+          post_esc = i;
           break;
         case '\n': // not lineSep
-          if (postEsc < i) {
-            sb.append(orig.substring(postEsc, i));
+          if (post_esc < i) {
+            sb.append(orig.substring(post_esc, i));
           }
           sb.append("\\n"); // not lineSep
-          postEsc = i + 1;
+          post_esc = i + 1;
           break;
         case '\r':
-          if (postEsc < i) {
-            sb.append(orig.substring(postEsc, i));
+          if (post_esc < i) {
+            sb.append(orig.substring(post_esc, i));
           }
           sb.append("\\r");
-          postEsc = i + 1;
+          post_esc = i + 1;
           break;
-        case '\t':
-          if (postEsc < i) {
-            sb.append(orig.substring(postEsc, i));
-          }
-          sb.append("\\t");
-          postEsc = i + 1;
-          break;
-
         default:
-          if (c >= ' ' && c <= '~') {
-            // Nothing to do: i gets incremented
-          } else if (c <= '\377') {
-            if (postEsc < i) {
-              sb.append(orig.substring(postEsc, i));
-            }
-            sb.append('\\');
-            int cAsInt = (int) c;
-            sb.append(String.format("%03o", cAsInt));
-            postEsc = i + 1;
-            break;
-          } else {
-            if (postEsc < i) {
-              sb.append(orig.substring(postEsc, i));
-            }
-            sb.append("\\u");
-            sb.append(String.format("%04x", (int) c));
-            postEsc = i + 1;
-            break;
-          }
+          // Do nothing; i gets incremented.
       }
     }
     if (sb.length() == 0) {
       return orig;
     }
-    sb.append(orig.substring(postEsc));
+    sb.append(orig.substring(post_esc));
     return sb.toString();
   }
 
-  //
-  // From class SignaturesUtil
-  //
-
-  /** A map from field descriptor (sach as "I") to Java primitive type (such as "int"). */
-  private static HashMap<String, String> fieldDescriptorToPrimitive = new HashMap<>(8);
+  private static HashMap<String, String> primitiveClassesFromJvm = new HashMap<>(8);
 
   static {
-    fieldDescriptorToPrimitive.put("Z", "boolean");
-    fieldDescriptorToPrimitive.put("B", "byte");
-    fieldDescriptorToPrimitive.put("C", "char");
-    fieldDescriptorToPrimitive.put("D", "double");
-    fieldDescriptorToPrimitive.put("F", "float");
-    fieldDescriptorToPrimitive.put("I", "int");
-    fieldDescriptorToPrimitive.put("J", "long");
-    fieldDescriptorToPrimitive.put("S", "short");
+    primitiveClassesFromJvm.put("Z", "boolean");
+    primitiveClassesFromJvm.put("B", "byte");
+    primitiveClassesFromJvm.put("C", "char");
+    primitiveClassesFromJvm.put("D", "double");
+    primitiveClassesFromJvm.put("F", "float");
+    primitiveClassesFromJvm.put("I", "int");
+    primitiveClassesFromJvm.put("J", "long");
+    primitiveClassesFromJvm.put("S", "short");
   }
 
-  /** Matches the "[[[" prefix of a field descriptor for an array. */
-  private static Pattern fdArrayBracketsPattern = Pattern.compile("^\\[+");
-
-  // does not convert "V" to "void".  Should it?
   /**
-   * Convert a field descriptor to a binary name. For example, convert "Ljava/util/Map$Entry;" to
-   * "java.util.Map$Entry".
+   * Convert a classname from JVML format to Java format. For example, convert "[Ljava/lang/Object;"
+   * to "java.lang.Object[]".
    *
-   * <p>Strictly speaking, there is no binary name for primitives and arrays. In those cases, the
-   * result is a "fully-qualified binary name" ({@code @}{@link FqBinaryName}). For example, this
-   * method converts "[Ljava/util/Map$Entry;" to "java.util.Map$Entry[]" and converts "I" to "int".
+   * <p>If the argument is not a field descriptor, returns it as is. This enables this method to be
+   * used on the output of {@link Class#getName()}.
+   */
+  @Deprecated
+  public static String classnameFromJvm(@FieldDescriptor String classname) {
+    return fieldDescriptorToBinaryName(classname);
+  }
+
+  /**
+   * Convert a classname from JVML format to Java format. For example, convert "[Ljava/lang/Object;"
+   * to "java.lang.Object[]".
    *
-   * @param typename a field descriptor (the name of a type in JVML format)
-   * @return the corresponding binary name
+   * <p>If the argument is not a field descriptor, returns it as is. This enables this method to be
+   * used on the output of {@link Class#getName()}.
    */
   @SuppressWarnings("signature") // conversion routine
-  public static @BinaryName String fieldDescriptorToBinaryName(@FieldDescriptor String typename) {
-    if (typename.equals("")) {
-      throw new Error("Empty string passed to fieldDescriptorToBinaryName");
+  public static String fieldDescriptorToBinaryName(@FieldDescriptor String classname) {
+
+    // System.out.println(classname);
+
+    int dims = 0;
+    while (classname.startsWith("[")) {
+      dims++;
+      classname = classname.substring(1);
     }
-    Matcher m = fdArrayBracketsPattern.matcher(typename);
-    String classname = m.replaceFirst("");
-    int dimensions = typename.length() - classname.length();
+
     String result;
+    // array of reference type
     if (classname.startsWith("L") && classname.endsWith(";")) {
       result = classname.substring(1, classname.length() - 1);
+      result = result.replace('/', '.');
     } else {
-      result = fieldDescriptorToPrimitive.get(classname);
+      if (dims > 0) // array of primitives
+      result = primitiveClassesFromJvm.get(classname);
+      else {
+        // just a primitive
+        result = classname;
+      }
+
       if (result == null) {
-        throw new Error(
-            "Malformed field descriptor should be \"L...;\" or a primitive: " + classname);
+        // As a failsafe, use the input; perhaps it is in Java, not JVML,
+        // format.
+        result = classname;
+        // throw new Error("Malformed base class: " + classname);
       }
     }
-    for (int i = 0; i < dimensions; i++) {
+    for (int i = 0; i < dims; i++) {
       result += "[]";
     }
-    return result.replace('/', '.');
+    return result;
   }
 
-  /**
-   * Convert a name in Class.getName format to a binary name. For example, convert
-   * "[Ljava.util.Map$Entry;" to "java.util.Map$Entry[]".
-   *
-   * @param typename a name in Class.getName format
-   * @return the corresponding binary name
-   */
-  @SuppressWarnings("signature") // conversion routine
-  public static @BinaryName String classGetNameToBinaryName(@ClassGetName String typename) {
-    if (typename.equals("")) {
-      throw new Error("Empty string passed to classGetNameToBinaryName");
-    }
-    Matcher m = fdArrayBracketsPattern.matcher(typename);
-    String classname = m.replaceFirst("");
-    int dimensions = typename.length() - classname.length();
-    String result;
-    if (dimensions == 0) {
-      return classname;
+  @SuppressWarnings("signature") // conversion method
+  public static final @BinaryName String classGetNameToBinaryName(@ClassGetName String cgn) {
+    if (cgn.startsWith("[")) {
+      return fieldDescriptorToBinaryName(cgn);
     } else {
-      if (classname.startsWith("L") && classname.endsWith(";")) {
-        result = classname.substring(1, classname.length() - 1);
-      } else {
-        result = fieldDescriptorToPrimitive.get(classname);
-        if (result == null) {
-          throw new Error(
-              "Malformed Class.getName array base type should be \"L...;\" or a primitive: "
-                  + classname);
-        }
-      }
-      for (int i = 0; i < dimensions; i++) {
-        result += "[]";
-      }
-      return result;
+      return cgn;
     }
   }
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // end of copied code
-  //
+  ///////////////////////////////////////////////////////////////////////////
+  /// end of copied code
+  ///
 
 }

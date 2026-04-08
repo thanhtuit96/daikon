@@ -31,11 +31,6 @@ import org.plumelib.reflection.Signatures;
  */
 public class AnnotateNullable {
 
-  /** Do not instantiate. */
-  private AnnotateNullable() {
-    throw new Error("Do not instantiate");
-  }
-
   // Why is this variable static?
   static PptMap ppts = new PptMap(); // dummy value, to satisfy Nullness Checker
 
@@ -139,8 +134,7 @@ public class AnnotateNullable {
       if (ppt.is_class()) {
         @SuppressWarnings(
             "nullness") // map: retrieve class name from class Ppt name, with string manipulation
-        @NonNull List<PptTopLevel> static_methods =
-            class_map.get(ppt.name().replace(":::CLASS", ""));
+        @NonNull List<PptTopLevel> static_methods = class_map.get(ppt.name().replace(":::CLASS", ""));
         int child_cnt = 0;
         // TODO: Once Checker Framework issue 565 has been fixed (https://tinyurl.com/cfissue/565),
         // change the following two lines back to
@@ -174,15 +168,9 @@ public class AnnotateNullable {
     }
   }
 
-  /**
-   * Returns the class program point corresponding to an object program point. Returns null if no
-   * corresponding class ppt exists.
-   *
-   * @param object_ppt an object program point
-   * @return the class program point corresponding to an object program point
-   */
+  // Returns null if no corresponding class ppt exists
   private static @Nullable PptTopLevel class_for_object(PptTopLevel object_ppt) {
-    if (object_ppt.parents.isEmpty()) {
+    if (object_ppt.parents.size() == 0) {
       return null;
     }
     assert object_ppt.parents.size() == 1 : object_ppt;
@@ -272,9 +260,9 @@ public class AnnotateNullable {
   }
 
   /**
-   * Returns the annotation for the specified variable. Returns @Nullable if samples were found for
-   * this variable and at least one sample contained a null value. Returns an (interned) empty
-   * string if no annotation is applicable. Otherwise, the return value contains a trailing space.
+   * Get the annotation for the specified variable. Returns @Nullable if samples were found for this
+   * variable and at least one sample contained a null value. Returns an (interned) empty string if
+   * no annotation is applicable. Otherwise, the return value contains a trailing space.
    */
   public static String get_annotation(PptTopLevel ppt, VarInfo vi) {
 
@@ -334,9 +322,7 @@ public class AnnotateNullable {
     if (stub_format) {
       System.out.printf(" %s %s(", return_annotation, ppt.ppt_name.getMethodName());
       for (int i = 0; i < params.size(); i++) {
-        if (i != 0) {
-          System.out.printf(" ,");
-        }
+        if (i != 0) System.out.printf(" ,");
         System.out.printf("%s %s %s", annos.get(i), "type-goes-here", names.get(i));
       }
       System.out.printf("); // %d samples%n", ppt.num_samples());
@@ -355,7 +341,7 @@ public class AnnotateNullable {
 
     for (VarInfo vi : ppt.var_infos) {
 
-      assert !vi.isPrestate() : vi;
+      assert (!vi.isPrestate()) : vi;
 
       // Skip anyone with a parent in the hierarchy.  We are only
       // interested in them at the top (e.g., we don't want to see
@@ -440,9 +426,9 @@ public class AnnotateNullable {
   }
 
   /**
-   * Returns true if the method of the specified ppt is static or not. The ppt must be an exit ppt.
-   * Exit ppts that do not have an object as a parent are inferred to be static. This does not work
-   * for enter ppts, because constructors do not have the object as a parent on entry.
+   * Returns whether or not the method of the specified ppt is static or not. The ppt must be an
+   * exit ppt. Exit ppts that do not have an object as a parent are inferred to be static. This does
+   * not work for enter ppts, because constructors do not have the object as a parent on entry.
    */
   @Pure
   public static boolean is_static_method(PptTopLevel ppt) {

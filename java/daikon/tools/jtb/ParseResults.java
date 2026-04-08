@@ -74,15 +74,12 @@ public class ParseResults {
     assert fileName.endsWith(".java")
         : "Found a java-file argument that doesn't end in .java: " + file;
 
-    try (Reader input = Files.newBufferedReader(Paths.get(javaFileName), UTF_8)) {
+    try {
+      Reader input = Files.newBufferedReader(Paths.get(javaFileName), UTF_8);
       JavaParser parser = new JavaParser(input);
       compilationUnit = parser.CompilationUnit();
-    } catch (Exception e) {
-      e.printStackTrace();
-      throw new Error(e);
-    }
+      input.close();
 
-    try {
       // To discard comments, we dump the AST without special
       // tokens, and then we read it again in the same way as
       // before.
@@ -94,10 +91,10 @@ public class ParseResults {
         compilationUnit.accept(dumper);
         output.close();
 
-        try (Reader input = new StringReader(output.toString())) {
-          JavaParser parser = new JavaParser(input);
-          compilationUnit = parser.CompilationUnit();
-        }
+        input = new StringReader(output.toString());
+        parser = new JavaParser(input);
+        compilationUnit = parser.CompilationUnit();
+        input.close();
       }
 
     } catch (Exception e) {

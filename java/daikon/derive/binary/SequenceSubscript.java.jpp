@@ -35,10 +35,10 @@ The correct way to build the system is to run 'make'.
 
 package daikon.derive.binary;
 
-import org.checkerframework.checker.interning.qual.Interned;
-import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
+import org.checkerframework.checker.lock.qual.GuardSatisfied;
+import org.checkerframework.checker.interning.qual.Interned;
 import java.util.logging.Logger;
 import daikon.*;
 import daikon.derive.*;
@@ -46,6 +46,9 @@ import org.plumelib.util.Intern;
 import org.plumelib.util.UtilPlume;
 
 public final class SEQUENCESCALARSUBSCRIPT extends BinaryDerivation {
+  // We are Serializable, so we specify a version to allow changes to
+  // method signatures without breaking serialization.  If you add or
+  // remove fields, you should change this number to the current date.
   static final long serialVersionUID = 20020122L;
 
   // Variables starting with dkconfig_ should only be set via the
@@ -93,11 +96,11 @@ public final class SEQUENCESCALARSUBSCRIPT extends BinaryDerivation {
   public String toString(@GuardSatisfied SEQUENCESCALARSUBSCRIPT this) {
     String shift = "";
     if (index_shift < 0) {
-      shift = Integer.toString(index_shift);
+      shift = "" + index_shift;
     } else if (index_shift > 0) {
       shift = "+" + index_shift;
     }
-    return seqvar().name().replace("[]", "") + "[" + sclvar().name() + shift + "]";
+    return (seqvar().name().replace("[]", "") + "[" + sclvar().name() + shift + "]");
   }
 
   @Override
@@ -143,6 +146,7 @@ public final class SEQUENCESCALARSUBSCRIPT extends BinaryDerivation {
       && (((SEQUENCESCALARSUBSCRIPT) other).index_shift == this.index_shift);
   }
 
+  /** Returns the ESC name for sequence subscript. */
   @SuppressWarnings("nullness")
   @SideEffectFree
   @Override
@@ -159,6 +163,7 @@ public final class SEQUENCESCALARSUBSCRIPT extends BinaryDerivation {
     }
   }
 
+  /** Returns the JML name for sequence subscript. */
   @SuppressWarnings("nullness")
   @Override
   public String jml_name(String index) {
@@ -184,6 +189,7 @@ public final class SEQUENCESCALARSUBSCRIPT extends BinaryDerivation {
     }
   }
 
+  /** Returns the CSHARPCONTRACT name for sequence subscript. */
   @SuppressWarnings("nullness")
   @SideEffectFree
   @Override
@@ -201,6 +207,7 @@ public final class SEQUENCESCALARSUBSCRIPT extends BinaryDerivation {
     }
   }
 
+  /** Return the simplify name for sequence subscript. */
   @SuppressWarnings("nullness")
   @SideEffectFree
   @Override

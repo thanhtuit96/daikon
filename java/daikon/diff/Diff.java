@@ -1,8 +1,5 @@
 package daikon.diff;
 
-import static java.util.logging.Level.FINE;
-import static java.util.logging.Level.INFO;
-
 import daikon.Daikon;
 import daikon.FileIO;
 import daikon.Ppt;
@@ -10,8 +7,7 @@ import daikon.PptConditional;
 import daikon.PptMap;
 import daikon.PptTopLevel;
 import daikon.inv.Invariant;
-import gnu.getopt.Getopt;
-import gnu.getopt.LongOpt;
+import gnu.getopt.*;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -25,6 +21,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NavigableSet;
 import java.util.TreeSet;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.checkerframework.checker.initialization.qual.UnknownInitialization;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
@@ -32,8 +29,8 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.checker.signature.qual.ClassGetName;
 import org.plumelib.util.CollectionsPlume;
 import org.plumelib.util.FilesPlume;
-import org.plumelib.util.IPair;
 import org.plumelib.util.OrderedPairIterator;
+import org.plumelib.util.Pair;
 import org.plumelib.util.StringsPlume;
 
 /**
@@ -118,11 +115,8 @@ public final class Diff {
       @Nullable @ClassGetName String invSortComparator2Classname,
       @Nullable @ClassGetName String invPairComparatorClassname,
       Comparator<Invariant> defaultComparator)
-      throws ClassNotFoundException,
-          IllegalAccessException,
-          InstantiationException,
-          InvocationTargetException,
-          NoSuchMethodException {
+      throws ClassNotFoundException, IllegalAccessException, InstantiationException,
+          InvocationTargetException, NoSuchMethodException {
     this.examineAllPpts = examineAllPpts;
     this.ignoreNumberedExits = ignoreNumberedExits;
     this.invSortComparator1 = selectComparator(invSortComparator1Classname, defaultComparator);
@@ -135,15 +129,9 @@ public final class Diff {
    * as necessary, and diff the InvMaps.
    */
   public static void main(String[] args)
-      throws FileNotFoundException,
-          StreamCorruptedException,
-          OptionalDataException,
-          IOException,
-          ClassNotFoundException,
-          IllegalAccessException,
-          InstantiationException,
-          InvocationTargetException,
-          NoSuchMethodException {
+      throws FileNotFoundException, StreamCorruptedException, OptionalDataException, IOException,
+          ClassNotFoundException, IllegalAccessException, InstantiationException,
+          InvocationTargetException, NoSuchMethodException {
     try {
       mainHelper(args);
     } catch (Daikon.DaikonTerminationException e) {
@@ -156,16 +144,10 @@ public final class Diff {
    * appropriate to be called progrmmatically.
    */
   public static void mainHelper(final String[] args)
-      throws FileNotFoundException,
-          StreamCorruptedException,
-          OptionalDataException,
-          IOException,
-          ClassNotFoundException,
-          InstantiationException,
-          IllegalAccessException,
-          InvocationTargetException,
-          NoSuchMethodException {
-    daikon.LogHelper.setupLogs(INFO);
+      throws FileNotFoundException, StreamCorruptedException, OptionalDataException, IOException,
+          ClassNotFoundException, InstantiationException, IllegalAccessException,
+          InvocationTargetException, NoSuchMethodException {
+    daikon.LogHelper.setupLogs(daikon.LogHelper.INFO);
 
     boolean printDiff = false;
     boolean printAll = false;
@@ -188,8 +170,8 @@ public final class Diff {
 
     boolean optionSelected = false;
 
-    daikon.LogHelper.setupLogs(INFO);
-    //     daikon.LogHelper.setLevel ("daikon.diff", FINE);
+    daikon.LogHelper.setupLogs(daikon.LogHelper.INFO);
+    //     daikon.LogHelper.setLevel ("daikon.diff", daikon.LogHelper.FINE);
 
     LongOpt[] longOpts =
         new LongOpt[] {
@@ -476,7 +458,7 @@ public final class Diff {
         root.accept(v);
         InvMap resultMap = v.getResult();
         FilesPlume.writeObject(resultMap, outputFile);
-        if (debug.isLoggable(FINE)) {
+        if (debug.isLoggable(Level.FINE)) {
           debug.fine("Result: " + resultMap.toString());
         }
 
@@ -544,13 +526,13 @@ public final class Diff {
       }
 
       // List<Invariant> invs = ppt.getInvariants();
-      List<Invariant> invs = CollectionsPlume.sorted(ppt.getInvariants(), PptTopLevel.icfp);
+      List<Invariant> invs = CollectionsPlume.sortList(ppt.getInvariants(), PptTopLevel.icfp);
       map.put(ppt, invs);
       if (examineAllPpts) {
         // Add conditional ppts
         for (PptConditional pptCond : ppt.cond_iterable()) {
           List<Invariant> invsCond =
-              CollectionsPlume.sorted(pptCond.getInvariants(), PptTopLevel.icfp);
+              CollectionsPlume.sortList(pptCond.getInvariants(), PptTopLevel.icfp);
           // List<Invariant> invsCond = pptCond.getInvariants();
           map.put(pptCond, invsCond);
         }
@@ -577,15 +559,15 @@ public final class Diff {
   public RootNode diffInvMap(InvMap map1, InvMap map2, boolean includeUnjustified) {
     RootNode root = new RootNode();
 
-    Iterator<IPair<@Nullable PptTopLevel, @Nullable PptTopLevel>> opi =
+    Iterator<Pair<@Nullable PptTopLevel, @Nullable PptTopLevel>> opi =
         new OrderedPairIterator<PptTopLevel>(
             map1.pptSortedIterator(PPT_COMPARATOR),
             map2.pptSortedIterator(PPT_COMPARATOR),
             PPT_COMPARATOR);
     while (opi.hasNext()) {
-      IPair<@Nullable PptTopLevel, @Nullable PptTopLevel> ppts = opi.next();
-      PptTopLevel ppt1 = ppts.first;
-      PptTopLevel ppt2 = ppts.second;
+      Pair<@Nullable PptTopLevel, @Nullable PptTopLevel> ppts = opi.next();
+      PptTopLevel ppt1 = ppts.a;
+      PptTopLevel ppt2 = ppts.b;
       if (shouldAdd(ppt1) || shouldAdd(ppt2)) {
         PptNode node = diffPptTopLevel(ppt1, ppt2, map1, map2, includeUnjustified);
         root.add(node);
@@ -662,12 +644,12 @@ public final class Diff {
       invs2 = new ArrayList<Invariant>();
     }
 
-    Iterator<IPair<@Nullable Invariant, @Nullable Invariant>> opi =
+    Iterator<Pair<@Nullable Invariant, @Nullable Invariant>> opi =
         new OrderedPairIterator<Invariant>(invs1.iterator(), invs2.iterator(), invPairComparator);
     while (opi.hasNext()) {
-      IPair<@Nullable Invariant, @Nullable Invariant> invariants = opi.next();
-      Invariant inv1 = invariants.first;
-      Invariant inv2 = invariants.second;
+      Pair<@Nullable Invariant, @Nullable Invariant> invariants = opi.next();
+      Invariant inv1 = invariants.a;
+      Invariant inv2 = invariants.b;
       if (!includeUnjustified) {
         if ((inv1 != null) && !inv1.justified()) {
           inv1 = null;
@@ -699,11 +681,8 @@ public final class Diff {
    */
   private static Comparator<Invariant> selectComparator(
       @Nullable @ClassGetName String classname, Comparator<Invariant> defaultComparator)
-      throws ClassNotFoundException,
-          IllegalAccessException,
-          InstantiationException,
-          InvocationTargetException,
-          NoSuchMethodException {
+      throws ClassNotFoundException, IllegalAccessException, InstantiationException,
+          InvocationTargetException, NoSuchMethodException {
 
     if (classname != null) {
       Class<?> cls = Class.forName(classname);

@@ -28,10 +28,9 @@ public class DTraceWriter extends DaikonWriter {
   //          - checkForVarRecursion: recursive check on on argument
   //        - traceClassVars: prints fields in a class
 
-  /** instance of a nonsensical value. */
+  /** instance of a nonsensical value */
   private static NonsensicalObject nonsenseValue = NonsensicalObject.getInstance();
-
-  /** instance of a nonsensical list. */
+  /** instance of a nonsensical list */
   private static List<Object> nonsenseList = NonsensicalList.getInstance();
 
   // certain class names
@@ -41,7 +40,7 @@ public class DTraceWriter extends DaikonWriter {
   /** Where to print output. */
   private PrintWriter outFile;
 
-  /** Debug information about daikon variables. */
+  /** debug information about daikon variables */
   private boolean debug_vars = false;
 
   /**
@@ -225,9 +224,7 @@ public class DTraceWriter extends DaikonWriter {
 
       if (debug_vars) {
         String out = curInfo.getDTraceValueString(val);
-        if (out.length() > 20) {
-          out = out.substring(0, 20);
-        }
+        if (out.length() > 20) out = out.substring(0, 20);
         System.out.printf(
             "  --variable %s [%d]= %s%n", curInfo.getName(), curInfo.children.size(), out);
       }
@@ -268,7 +265,7 @@ public class DTraceWriter extends DaikonWriter {
   }
 
   /**
-   * Returns the value of a certain field in theObj.
+   * Get the value of a certain field in theObj.
    *
    * @param classField which field we are interested in
    * @param theObj the object whose field we are examining. TheoObj must be null, Nonsensical, or of
@@ -364,7 +361,7 @@ public class DTraceWriter extends DaikonWriter {
   }
 
   /**
-   * Returns a List derived from an aray.
+   * Return a List derived from an aray.
    *
    * @param arrayVal must be an array type
    * @return a List (with correct primitive wrappers) corresponding to the array
@@ -459,7 +456,7 @@ public class DTraceWriter extends DaikonWriter {
   }
 
   /**
-   * Returns the type of val, removing any PrimitiveWrapper if it exists For example, if we execute
+   * Get the type of val, removing any PrimitiveWrapper if it exists For example, if we execute
    * removeWRappers(val, boolean.class, true) where (val instanceof Runtime.PrimitiveWrapper), then
    * the method returns boolean.class
    *

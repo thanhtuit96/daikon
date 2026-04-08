@@ -18,23 +18,17 @@ import daikon.chicory.StaticObjInfo;
 import daikon.chicory.StringInfo;
 import daikon.chicory.ThisObjInfo;
 import daikon.plumelib.bcelutil.SimpleLog;
-import daikon.plumelib.util.StringsPlume;
 import daikon.plumelib.util.WeakIdentityHashMap;
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.io.PrintWriter;
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -44,15 +38,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
-import org.checkerframework.checker.mustcall.qual.MustCall;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.checker.nullness.qual.PolyNull;
-import org.checkerframework.checker.signature.qual.BinaryName;
 import org.checkerframework.dataflow.qual.Pure;
 
 /**
@@ -84,14 +75,10 @@ public final class DCRuntime implements ComparabilityProvider {
   static int max_jdk_static = 100000;
 
   /** If the application exits with an exception, it should be placed here. */
-  @SuppressWarnings("StaticAssignmentOfThrowable") // for debugging (I presume)
   public static @Nullable Throwable exit_exception = null;
 
   /** Storage for each static tag. */
   public static List<@Nullable Object> static_tags = new ArrayList<>();
-
-  /** Either "java.lang.DCompInstrumented" or "daikon.dcomp.DCompInstrumented". */
-  static @BinaryName String instrumentation_interface;
 
   /**
    * Object used to mark procedure entries in the tag stack. It is pushed on the stack at entry and
@@ -102,34 +89,24 @@ public final class DCRuntime implements ComparabilityProvider {
 
   /** Control debug printing. */
   public static boolean debug = false;
-
   /** Log comparability tage stack operations. */
   public static boolean debug_tag_frame = false;
-
   /** Log object compare operations. */
   public static boolean debug_objects = false;
-
   /** Log variable comparability operations. */
   public static SimpleLog merge_dv = new SimpleLog(false);
-
   /** Log array comparability operations. */
   public static SimpleLog debug_arr_index = new SimpleLog(false);
-
   /** Log primitive operations. */
   public static SimpleLog debug_primitive = new SimpleLog(false);
-
   /** Log comparability merges. */
   public static SimpleLog debug_merge_comp = new SimpleLog(false);
-
   /** Log excution time. */
   public static SimpleLog debug_timing = new SimpleLog(false);
-
   /** Log decl output. */
   public static SimpleLog debug_decl_print = new SimpleLog(false);
-
   /** Log excution time. */
   public static SimpleLog time_decl = new SimpleLog(false);
-
   /** Log internal data structure sizes. */
   public static SimpleLog map_info = new SimpleLog(false);
 
@@ -144,7 +121,7 @@ public final class DCRuntime implements ComparabilityProvider {
   // Set in Premain.premain().
   static ComparabilityProvider comparabilityProvider;
 
-  /** True if the header has been printed. */
+  /** Whether the header has been printed. */
   private static boolean headerPrinted = false;
 
   /** Class to hold per-thread comparability data. */
@@ -155,7 +132,7 @@ public final class DCRuntime implements ComparabilityProvider {
     /** Number of methods currently on tag_stack. */
     int tag_stack_call_depth;
 
-    /** class initializer. */
+    /** class initializer */
     ThreadData() {
       tag_stack = new ArrayDeque<Object>();
       tag_stack_call_depth = 0;
@@ -185,12 +162,17 @@ public final class DCRuntime implements ComparabilityProvider {
    * Class used as a tag for uninitialized instance fields. Only different from Object for debugging
    * purposes.
    */
-  @SuppressWarnings("UnusedVariable") // used only for debugging
   private static class UninitFieldTag {
-    final String descr;
-    final Throwable stack_trace;
+    String descr;
+    @Nullable Throwable stack_trace = null;
 
-    UninitFieldTag(String descr, Throwable stack_trace) {
+    public UninitFieldTag() {}
+
+    public UninitFieldTag(String descr) {
+      this.descr = descr;
+    }
+
+    public UninitFieldTag(String descr, Throwable stack_trace) {
       this.descr = descr;
       this.stack_trace = stack_trace;
     }
@@ -229,7 +211,7 @@ public final class DCRuntime implements ComparabilityProvider {
     }
 
     try {
-      if (!Premain.jdk_instrumented) {
+      if (!DCInstrument.jdk_instrumented) {
         dcomp_marker_class = Class.forName("daikon.dcomp.DCompMarker");
       } else {
         dcomp_marker_class = Class.forName("java.lang.DCompMarker");
@@ -238,7 +220,7 @@ public final class DCRuntime implements ComparabilityProvider {
       Class<Object> tmp = (Class<Object>) Class.forName("java.lang.Object");
       java_lang_Object_class = tmp;
     } catch (Exception e) {
-      throw new RuntimeException("Error initializing DCRuntime", e);
+      throw new RuntimeException("Unexpected error initializing DCRuntime:", e);
     }
 
     // Initialize the array of static tags
@@ -269,7 +251,7 @@ public final class DCRuntime implements ComparabilityProvider {
    *
    * @param o1 the first argument to equals()
    * @param o2 the second argument to equals()
-   * @return true if the two values are equal
+   * @return whether the two values are equal
    */
   public static boolean dcomp_equals(Object o1, Object o2) {
     // Make obj1 and obj2 comparable
@@ -289,7 +271,7 @@ public final class DCRuntime implements ComparabilityProvider {
     } catch (NoSuchMethodException e) {
       m = null;
     } catch (Exception e) {
-      throw new RuntimeException("Error locating equals_dcomp_instrumented", e);
+      throw new RuntimeException("unexpected error locating equal_dcomp_instrumented", e);
     }
 
     if (m != null) {
@@ -298,16 +280,14 @@ public final class DCRuntime implements ComparabilityProvider {
         m.setAccessible(true);
         return (Boolean) m.invoke(o1, o2);
       } catch (Exception e) {
-        throw new RuntimeException("Error invoking equals_dcomp_instrumented", e);
+        throw new RuntimeException("unexpected error invoking equal_dcomp_instrumented", e);
       }
     }
 
     // Push tag for return value, and call the uninstrumented version
     ThreadData td = thread_to_data.get(Thread.currentThread());
     td.tag_stack.push(new Constant());
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
     return o1.equals(o2);
   }
 
@@ -331,7 +311,7 @@ public final class DCRuntime implements ComparabilityProvider {
    *
    * @param o1 the first argument to super.equals()
    * @param o2 the second argument to super.equals()
-   * @return true if the two values are equal, according to super.equals()
+   * @return whether the two values are equal, according to super.equals()
    * @see #active_equals_calls
    */
   public static boolean dcomp_super_equals(Object o1, Object o2) {
@@ -364,7 +344,7 @@ public final class DCRuntime implements ComparabilityProvider {
 
     boolean instrumented = false;
     for (Class<?> c : o1superifaces) {
-      if (c.getName().equals(instrumentation_interface)) {
+      if (c.getName().equals(DCInstrument.instrumentation_interface)) {
         instrumented = true;
         break;
       }
@@ -381,13 +361,11 @@ public final class DCRuntime implements ComparabilityProvider {
         return_val = ((Boolean) m.invoke(o1, o2, null));
       } else {
         // Push tag for return value, and call the uninstrumented version
-        @MustCall ThreadData td = thread_to_data.get(Thread.currentThread());
+        ThreadData td = thread_to_data.get(Thread.currentThread());
         td.tag_stack.push(new Constant());
         Method m = o1super.getMethod("equals", new Class<?>[] {java_lang_Object_class});
         return_val = ((Boolean) m.invoke(o1, o2));
-        if (debug_tag_frame) {
-          System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-        }
+        if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
       }
     } catch (NoSuchMethodException e) {
       System.err.printf("dcomp_super_equals(%s, %s)%n", obj_str(o1), obj_str(o2));
@@ -405,7 +383,7 @@ public final class DCRuntime implements ComparabilityProvider {
       e.printStackTrace();
       throw new RuntimeException(e);
     } catch (Exception e) {
-      throw new RuntimeException("Error locating equals method", e);
+      throw new RuntimeException("unexpected error locating equals method", e);
     }
 
     // We are now done with the call, so remove the entry for this
@@ -449,7 +427,7 @@ public final class DCRuntime implements ComparabilityProvider {
           }
 
           // Should never reach top of class heirarchy without finding a clone() method.
-          assert !target_class.getName().equals("java.lang.Object");
+          assert (!target_class.getName().equals("java.lang.Object"));
 
           // We didn't find a clone method, get next higher super and try again.
           target_class = target_class.getSuperclass();
@@ -523,7 +501,7 @@ public final class DCRuntime implements ComparabilityProvider {
           }
 
           // Should never reach top of class heirarchy without finding a clone() method.
-          assert !target_class.getName().equals("java.lang.Object");
+          assert (!target_class.getName().equals("java.lang.Object"));
 
           // We didn't find a clone method, get next higher super and try again.
           target_class = active_clone_calls.get(orig_obj).getSuperclass();
@@ -552,7 +530,7 @@ public final class DCRuntime implements ComparabilityProvider {
    * instrumented, call the instrumented version of clone; if not, call the uninstrumented version.
    *
    * <p>Note: we use getDeclaredMethod as clone is often protected; also, in the case of
-   * dcomp_super_clone we do not want to automatically find clone in a superclass. We will search
+   * dcomp_super_clone we do not want to automatically find clone in a super class. We will search
    * the hierarchy ourselves.
    *
    * @param orig_obj object being cloned
@@ -572,14 +550,12 @@ public final class DCRuntime implements ComparabilityProvider {
     } catch (NoSuchMethodException e) {
       m = null;
     } catch (Exception e) {
-      throw new RuntimeException("Error locating clone(DCompMarker)", e);
+      throw new RuntimeException("unexpected error locating clone(DCompMarker)", e);
     }
 
     if (m != null) {
       try {
-        if (debug) {
-          System.out.printf("found: %s%n", m);
-        }
+        if (debug) System.out.printf("found: %s%n", m);
         // In case the class containing "clone()" is not accessible
         // or clone() is protected.
         m.setAccessible(true);
@@ -592,7 +568,9 @@ public final class DCRuntime implements ComparabilityProvider {
         throw e.getCause();
       } catch (Exception e) {
         throw new RuntimeException(
-            "Error invoking clone(DCompMarker) on object of class " + orig_obj.getClass(), e);
+            "unexpected error invoking clone(DCompMarker) on object of class "
+                + orig_obj.getClass(),
+            e);
       }
     }
 
@@ -602,12 +580,10 @@ public final class DCRuntime implements ComparabilityProvider {
     } catch (NoSuchMethodException e) {
       throw new RuntimeException("unable to locate clone()", e);
     } catch (Exception e) {
-      throw new RuntimeException("Error locating clone()", e);
+      throw new RuntimeException("unexpected error locating clone()", e);
     }
     try {
-      if (debug) {
-        System.out.printf("found: %s%n", m);
-      }
+      if (debug) System.out.printf("found: %s%n", m);
       // In case the class containing "clone()" is not accessible
       // or clone() is protected.
       m.setAccessible(true);
@@ -618,7 +594,7 @@ public final class DCRuntime implements ComparabilityProvider {
       throw e.getCause();
     } catch (Exception e) {
       throw new RuntimeException(
-          "Error invoking clone() on object of class " + orig_obj.getClass(), e);
+          "unexpected error invoking clone() on object of class " + orig_obj.getClass(), e);
     }
   }
 
@@ -776,9 +752,7 @@ public final class DCRuntime implements ComparabilityProvider {
       System.out.printf("tag stack call_depth: %d%n", td.tag_stack_call_depth);
       System.out.printf("tag stack size: %d%n", td.tag_stack.size());
     }
-    if (debug) {
-      System.out.printf("Normal exit from %s%n%n", caller_name());
-    }
+    if (debug) System.out.printf("Normal exit from %s%n%n", caller_name());
   }
 
   /**
@@ -861,14 +835,10 @@ public final class DCRuntime implements ComparabilityProvider {
     if (debug_tag_frame) {
       System.out.printf("tag stack call_depth: %d%n", td.tag_stack_call_depth);
     }
-    if (debug) {
-      System.out.printf("Exception exit from %s%n", caller_name());
-    }
+    if (debug) System.out.printf("Exception exit from %s%n", caller_name());
     while (!td.tag_stack.isEmpty()) {
       if (td.tag_stack.pop() == method_marker) {
-        if (debug_tag_frame) {
-          System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-        }
+        if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
         return;
       }
     }
@@ -883,9 +853,7 @@ public final class DCRuntime implements ComparabilityProvider {
     }
     ThreadData td = thread_to_data.get(Thread.currentThread());
     while (td.tag_stack.peek() != method_marker) td.tag_stack.pop();
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /** Pushes the tag at tag_frame[index] on the tag stack. */
@@ -895,9 +863,7 @@ public final class DCRuntime implements ComparabilityProvider {
     debug_primitive.log("push_local_tag[%d] %s%n", index, tag_frame[index]);
     assert tag_frame[index] != null : "index " + index;
     td.tag_stack.push(tag_frame[index]);
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /** Pops the top of the tag stack into tag_frame[index] */
@@ -908,9 +874,7 @@ public final class DCRuntime implements ComparabilityProvider {
     tag_frame[index] = td.tag_stack.pop();
     assert tag_frame[index] != null : "index " + index;
     debug_primitive.log("pop_local_tag[%d] %s%n", index, tag_frame[index]);
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /** Pushes the tag associated with the static static_num on the tag stack. */
@@ -924,9 +888,7 @@ public final class DCRuntime implements ComparabilityProvider {
     }
     td.tag_stack.push(static_tag);
     debug_primitive.log("push_static_tag[%d] %s%n", static_num, static_tag);
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /**
@@ -941,9 +903,7 @@ public final class DCRuntime implements ComparabilityProvider {
     if (debug_arr_index.enabled()) {
       debug_arr_index.log("push_array_tag %s%n", obj_str(arr_ref));
     }
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /**
@@ -958,9 +918,7 @@ public final class DCRuntime implements ComparabilityProvider {
     static_tags.set(static_num, td.tag_stack.pop());
     assert static_tags.get(static_num) != null;
     debug_primitive.log("pop_static_tag[%d] %s%n", static_num, static_tags.get(static_num));
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /**
@@ -978,14 +936,10 @@ public final class DCRuntime implements ComparabilityProvider {
     // debug_print_call_stack();
     while (--cnt >= 0) {
       assert td.tag_stack.peek() != method_marker;
-      if (debug) {
-        System.out.printf("   discard a tag%n");
-      }
+      if (debug) System.out.printf("   discard a tag%n");
       td.tag_stack.pop();
     }
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /**
@@ -1029,12 +983,8 @@ public final class DCRuntime implements ComparabilityProvider {
     if (debug_arr_index.enabled()) {
       debug_arr_index.log("Merging array '%s' and index '%s'", obj_str(arr_ref), index_tag);
     }
-    if (merge_arrays_and_indices) {
-      TagEntry.union(arr_ref, index_tag);
-    }
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (merge_arrays_and_indices) TagEntry.union(arr_ref, index_tag);
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /** Execute an aastore instruction and mark the array and its index as comparable. */
@@ -1051,9 +1001,7 @@ public final class DCRuntime implements ComparabilityProvider {
 
     // Store the value
     arr[index] = val;
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /**
@@ -1097,7 +1045,6 @@ public final class DCRuntime implements ComparabilityProvider {
     // Execute the array store
     arr[index] = val;
   }
-
   /**
    * Execute an dastore instruction and manipulate the tags accordingly. The tag at the top of stack
    * is stored into the tag storage for the array.
@@ -1193,9 +1140,7 @@ public final class DCRuntime implements ComparabilityProvider {
     for (Object subarr : arr) {
       TagEntry.union(count2tag, subarr);
     }
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /**
@@ -1233,10 +1178,10 @@ public final class DCRuntime implements ComparabilityProvider {
     ClassInfo ci = mi.class_info;
     if (ci.clazz == null) {
       ci.initViaReflection();
-      if (debug) {
-        System.out.printf("DCRuntime.enter adding %s to all class list%n", ci);
-      }
+      if (debug) System.out.printf("DCRuntime.enter adding %s to all class list%n", ci);
       all_classes.add(ci);
+      // Moved to DCInstrument.instrument()
+      // daikon.chicory.Runtime.all_classes.add (ci);
       merge_dv.log("initializing traversal for %s%n", ci);
       ci.init_traversal(depth);
     }
@@ -1289,8 +1234,7 @@ public final class DCRuntime implements ComparabilityProvider {
         System.out.printf("'%s' ", obj_str(arg));
       }
       System.out.println();
-      System.out.printf(
-          "ret_val = %s%nexit_line_number= %d%n%n", obj_str(ret_val), exit_line_number);
+      System.out.printf("ret_val = %s%nexit_line_number= %d%n%n", ret_val, exit_line_number);
     }
 
     MethodInfo mi = methods.get(mi_index);
@@ -1307,21 +1251,13 @@ public final class DCRuntime implements ComparabilityProvider {
   /**
    * Process all of the daikon variables in the tree starting at root. If the values referenced by
    * those variables are comparable mark the variables as comparable.
-   *
-   * @param mi a MethodInfo
-   * @param root the daikon variables
-   * @param tag_frame the tags for the primitive arguments of this method
-   * @param obj the value of {@code this}, or null if the method is static
-   * @param args the arguments to the method
-   * @param ret_val value returned by the method, or null if the method is a constructor or void
    */
   public static void process_all_vars(
       MethodInfo mi, RootInfo root, Object[] tag_frame, Object obj, Object[] args, Object ret_val) {
 
     debug_timing.log("process_all_vars for %s%n", mi);
 
-    merge_dv.log("this: %s%n", obj_str(obj));
-
+    merge_dv.log("this: %s%n", obj);
     // For some reason the following line causes DynComp to behave incorrectly.
     // I have not take the time to investigate.
     // merge_dv.log("arguments: %s%n", Arrays.toString(args));
@@ -1339,9 +1275,7 @@ public final class DCRuntime implements ComparabilityProvider {
         Object p = args[pi.getArgNum()];
         // Class arg_type = mi.arg_types[pi.getArgNum()];
         // if (arg_type.isPrimitive())
-        if (pi.isPrimitive()) {
-          p = tag_frame[pi.get_param_offset() + ((obj == null) ? 0 : 1)];
-        }
+        if (pi.isPrimitive()) p = tag_frame[pi.get_param_offset() + ((obj == null) ? 0 : 1)];
         merge_comparability(varmap, null, p, pi);
       } else if (dv instanceof ReturnInfo) {
         if (mi.return_type().isPrimitive()) {
@@ -1411,9 +1345,7 @@ public final class DCRuntime implements ComparabilityProvider {
    * @return the specified object
    */
   public static Object get_object_field(Field f, Object obj) {
-    if (debug) {
-      System.out.printf("In get_object_field%n");
-    }
+    if (debug) System.out.printf("In get_object_field%n");
     try {
       return f.get(obj);
     } catch (Exception e) {
@@ -1441,9 +1373,7 @@ public final class DCRuntime implements ComparabilityProvider {
     // merge_dv.enabled = dv.getName().contains ("mtfFreq");
 
     long start_millis = 0;
-    if (debug_timing.enabled()) {
-      start_millis = System.currentTimeMillis();
-    }
+    if (debug_timing.enabled()) start_millis = System.currentTimeMillis();
     if (merge_dv.enabled()) {
       merge_dv.log("merge_comparability: checking var %s = '%s' %n", dv, obj_str(obj));
     }
@@ -1468,9 +1398,7 @@ public final class DCRuntime implements ComparabilityProvider {
     } else if (dv.isArray() && (tag instanceof List<?>)) {
       @SuppressWarnings("unchecked")
       List<Object> elements = (List<Object>) tag;
-      if (debug_timing.enabled()) {
-        debug_timing.log("  ArrayInfo %d elements", elements.size());
-      }
+      if (debug_timing.enabled()) debug_timing.log("  ArrayInfo %d elements", elements.size());
       for (Object atag : elements) {
         // Ignore null and nonsensical tags.  There is no reason to process
         // their children, because they can't have any with reasonable values
@@ -1504,9 +1432,7 @@ public final class DCRuntime implements ComparabilityProvider {
         return;
       }
       Object[] elements = (Object[]) tag;
-      if (debug_timing.enabled()) {
-        debug_timing.log("  Prim ArrayInfo %d elements", elements.length);
-      }
+      if (debug_timing.enabled()) debug_timing.log("  Prim ArrayInfo %d elements", elements.length);
       Object prev_tag = null;
       for (Object atag : elements) {
         // Ignore null and nonsensical tags.  There is no reason to process
@@ -1687,7 +1613,6 @@ public final class DCRuntime implements ComparabilityProvider {
   static int synthetic_cnt = 0;
   static int enum_cnt = 0;
 
-  // Only called if 'verbose' is true.
   /** Prints statistics about the number of decls to stdout. */
   public static void decl_stats() {
 
@@ -1771,9 +1696,8 @@ public final class DCRuntime implements ComparabilityProvider {
       } else if (dv instanceof FieldInfo) {
         Field field = ((FieldInfo) dv).getField();
         int modifiers = field.getModifiers();
-        if (field.isEnumConstant()) {
-          enum_cnt++;
-        } else if (field.isSynthetic()) synthetic_cnt++;
+        if (field.isEnumConstant()) enum_cnt++;
+        else if (field.isSynthetic()) synthetic_cnt++;
         else if (Modifier.isStatic(modifiers) && Modifier.isFinal(modifiers)) static_final_cnt++;
         else if (Modifier.isStatic(modifiers)) static_cnt++;
         else if (dv.getName().startsWith("this")) this_instance_cnt++;
@@ -1837,7 +1761,6 @@ public final class DCRuntime implements ComparabilityProvider {
   static long ppt_name_ms = 0;
   static long decl_vars_ms = 0;
   static long total_ms = 0;
-
   // static Stopwatch watch = new Stopwatch();
 
   /**
@@ -1898,10 +1821,8 @@ public final class DCRuntime implements ComparabilityProvider {
 
   /** Map from array name to comparability for its indices (if any). */
   private static Map<String, Integer> arr_index_map;
-
   /** Map from variable to its comparability. */
   private static IdentityHashMap<DaikonVariableInfo, Integer> dv_comp_map;
-
   /** Comparability value for a variable. */
   private static int base_comp;
 
@@ -1944,9 +1865,8 @@ public final class DCRuntime implements ComparabilityProvider {
       boolean non_hashcode_vars = false;
       // System.out.printf("Checking dv set %s%n", set);
       for (DaikonVariableInfo dv : set) {
-        if (dv.isHashcode() || dv.isHashcodeArray()) {
-          hashcode_vars = true;
-        } else {
+        if (dv.isHashcode() || dv.isHashcodeArray()) hashcode_vars = true;
+        else {
           non_hashcode_vars = true;
         }
         // System.out.printf("dv = %s, hashcode_var = %b%n",
@@ -2070,7 +1990,7 @@ public final class DCRuntime implements ComparabilityProvider {
         if ((set.size() == 1) && (set.get(0) instanceof StaticObjInfo)) {
           continue;
         }
-        List<String> stuff = skinnyOutput(set, daikon.DynComp.abridged_vars);
+        ArrayList<String> stuff = skinyOutput(set, daikon.DynComp.abridged_vars);
         // To see "daikon.chicory.FooInfo:variable", change true to false
         pw.printf("  [%d] %s%n", stuff.size(), stuff);
       }
@@ -2085,7 +2005,7 @@ public final class DCRuntime implements ComparabilityProvider {
         if ((set.size() == 1) && (set.get(0) instanceof StaticObjInfo)) {
           continue;
         }
-        List<String> stuff = skinnyOutput(set, daikon.DynComp.abridged_vars);
+        ArrayList<String> stuff = skinyOutput(set, daikon.DynComp.abridged_vars);
         // To see "daikon.chicory.FooInfo:variable", change true to false
         pw.printf("  [%d] %s%n", stuff.size(), stuff);
       }
@@ -2152,14 +2072,12 @@ public final class DCRuntime implements ComparabilityProvider {
      */
 
     if (depth == 0) {
-      pw.printf("%s%n", skinnyOutput(node, daikon.DynComp.abridged_vars));
+      pw.printf("%s%n", skinyOutput(node, daikon.DynComp.abridged_vars));
       if (tree.get(node) == null) {
         return;
       }
       for (DaikonVariableInfo child : tree.get(node)) {
-        if (child != node) {
-          printTree(pw, tree, child, depth + 1);
-        }
+        if (child != node) printTree(pw, tree, child, depth + 1);
       }
     } else {
       for (int i = 0; i < depth; i++) {
@@ -2167,55 +2085,39 @@ public final class DCRuntime implements ComparabilityProvider {
       }
       pw.printf(
           "%s (%s)%n",
-          skinnyOutput(node, daikon.DynComp.abridged_vars), TagEntry.get_line_trace(node));
+          skinyOutput(node, daikon.DynComp.abridged_vars), TagEntry.get_line_trace(node));
       if (tree.get(node) == null) {
         return;
       }
       for (DaikonVariableInfo child : tree.get(node)) {
-        if (child != node) {
-          printTree(pw, tree, child, depth + 1);
-        }
+        if (child != node) printTree(pw, tree, child, depth + 1);
       }
     }
   }
 
   /**
-   * If {@code on} is true, returns an ArrayList of Strings that converts the usual
-   * DVInfo.toString() output to a more readable form. Just uses DVInfo.toString if {@code on} is
-   * false.
+   * If on, returns an ArrayList of Strings that converts the usual DVInfo.toString() output to a
+   * more readable form
    *
    * <p>e.g. "daikon.chicory.ParameterInfo:foo" becomes "Parameter foo"
    *
    * <p>"daikon.chicory.FieldInfo:this.foo" becomes "Field foo"
-   *
-   * @param l a DVSet
-   * @param on value of daikon.Daikon.abridger_vars
-   * @return a readable version of {@code l}
    */
-  private static List<String> skinnyOutput(DVSet l, boolean on) {
-    List<String> o = new ArrayList<>();
+  private static ArrayList<String> skinyOutput(DVSet l, boolean on) {
+    ArrayList<String> o = new ArrayList<>();
     for (DaikonVariableInfo dvi : l) {
-      o.add(skinnyOutput(dvi, on));
+      o.add(skinyOutput(dvi, on));
     }
     return o;
   }
 
-  // TODO: This should be a method of DaikonVariableInfo.
-  /**
-   * If {@code on} is false, returns {@code dv.toString()}. If {@code on} is true, returns a more
-   * readable and informative string.
-   *
-   * @param dv a Daikon variable
-   * @param on value of daikon.Daikon.abridger_vars
-   * @return a readable version of {@code dv}
-   */
-  private static String skinnyOutput(DaikonVariableInfo dv, boolean on) {
+  private static String skinyOutput(DaikonVariableInfo dv, boolean on) {
     if (!on) {
       return dv.toString();
     }
     String dvtxt = dv.toString();
     String type = dvtxt.split(":")[0];
-    type = type.substring(type.lastIndexOf('.') + 1);
+    type = type.substring(type.lastIndexOf(".") + 1);
     String name = dvtxt.split(":")[1];
     if (type.equals("ThisObjInfo")) {
       dvtxt = "this";
@@ -2229,9 +2131,7 @@ public final class DCRuntime implements ComparabilityProvider {
       }
       if (name.startsWith("this.")) {
         name = name.substring(5);
-        if (!type.endsWith("Field")) {
-          type = (type + " Field").trim();
-        }
+        if (!type.endsWith("Field")) type = (type + " Field").trim();
       }
       dvtxt = type + " " + name;
     }
@@ -2242,55 +2142,26 @@ public final class DCRuntime implements ComparabilityProvider {
   private static class DVSet extends ArrayList<DaikonVariableInfo> implements Comparable<DVSet> {
     static final long serialVersionUID = 20050923L;
 
-    /** Creates an empty DVSet. */
-    private DVSet() {
-      super();
-    }
-
-    /**
-     * Creates a DVSet with that contains the given variables.
-     *
-     * @param variables the variables
-     */
-    private DVSet(Collection<DaikonVariableInfo> variables) {
-      super(variables);
-    }
-
     @Pure
     @Override
     public int compareTo(@GuardSatisfied DVSet this, DVSet s1) {
-      if (s1.isEmpty()) {
+      if (s1.size() == 0) {
         return 1;
-      } else if (isEmpty()) {
+      } else if (size() == 0) {
         return -1;
       } else {
         return this.get(0).compareTo(s1.get(0));
       }
     }
 
-    void sort() {
+    public void sort() {
       Collections.sort(this);
-    }
-
-    /**
-     * Returns a multi-line representation of the list of variables.
-     *
-     * @return a multi-line representation of the list of variables
-     */
-    String toStringWithIdentityHashCode() {
-      StringJoiner result = new StringJoiner(System.lineSeparator());
-      result.add("DVSet(");
-      for (DaikonVariableInfo dvi : this) {
-        result.add("  " + dvi.toStringWithIdentityHashCode());
-      }
-      result.add("  )");
-      return result.toString();
     }
   }
 
   /**
-   * Gets a list of comparability sets of Daikon variables. Returns null if the method has never
-   * been executed (it would probably be better to return each variable in a separate set, but I
+   * Gets a list of comparability sets of Daikon variables. If the method has never been executed
+   * returns null (it would probably be better to return each variable in a separate set, but I
    * wanted to differentiate this case for now).
    *
    * <p>The sets are calculated by processing each daikon variable and adding it to a list
@@ -2325,32 +2196,6 @@ public final class DCRuntime implements ComparabilityProvider {
   }
 
   /**
-   * Produce debugging output for a {@code List<DVSet>}.
-   *
-   * @param dvsets a list of DVSet objects
-   * @param indent how many spaces to indent each line
-   * @return a string representation of {@code dvsets}
-   */
-  static String dvSetsToString(List<DVSet> dvsets, int indent) {
-    // On Java 11, do
-    //   ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    //   try (PrintStream ps = new PrintStream(baos, true, StandardCharsets.UTF_8)) {
-    //   ...
-    //   return baos.toString(StandardCharsets.UTF_8);
-    // and drop the catch clause.
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    String utf8 = StandardCharsets.UTF_8.name();
-    try (PrintStream ps = new PrintStream(baos, true, utf8)) {
-      for (DVSet dvset : dvsets) {
-        ps.println(StringsPlume.indentLines(indent, dvset.toStringWithIdentityHashCode()));
-      }
-      return baos.toString(utf8);
-    } catch (UnsupportedEncodingException e) {
-      throw new Error(e);
-    }
-  }
-
-  /**
    * Returns a map representing the tree of tracers. Represents the tree as entries in a map with
    * each parent node as the key to a set contains all its children. The parameter RootInfo node is
    * included as a key to all its children.
@@ -2369,9 +2214,7 @@ public final class DCRuntime implements ComparabilityProvider {
         new IdentityHashMap<DaikonVariableInfo, DVSet>(256);
 
     for (DaikonVariableInfo child : root) {
-      if (child.declShouldPrint()) {
-        add_variable_traced(sets, child);
-      }
+      if (child.declShouldPrint()) add_variable_traced(sets, child);
     }
     for (DVSet dvs : sets.values()) {
       dvs.sort();
@@ -2466,13 +2309,6 @@ public final class DCRuntime implements ComparabilityProvider {
    */
   static void merge_dv_comparability(RootInfo src, RootInfo dest, String debuginfo) {
 
-    // TODO: Why does this take a RootInfo?  A RootInfo contains many more variables than we are
-    // interested in.
-    // What is a better way to obtain just the relevant DaikonVariableInfo objects for a given
-    // program point?
-
-    // TODO: We should never merge across different program points.
-
     debug_merge_comp.log("merge_dv_comparability: %s%n", debuginfo);
 
     debug_merge_comp.indent();
@@ -2480,23 +2316,7 @@ public final class DCRuntime implements ComparabilityProvider {
     // Create a map relating destination names to their variables
     Map<String, DaikonVariableInfo> dest_map = new LinkedHashMap<>();
     for (DaikonVariableInfo dest_var : varlist(dest)) {
-      String dest_var_name = dest_var.getName();
-      if (false) { // temporarily commented out because it is failing
-        if (dest_map.containsKey(dest_var_name)) {
-          DaikonVariableInfo old_dest_var = dest_map.get(dest_var_name);
-          String msg =
-              String.format(
-                  "duplicate var name %s%n from old_dest_var = %s%n and dest_var = %s%n" + " in %s",
-                  dest_var_name,
-                  old_dest_var.toStringWithIdentityHashCode(),
-                  dest_var.toStringWithIdentityHashCode(),
-                  new DVSet(varlist(dest)).toStringWithIdentityHashCode());
-          System.out.println(msg);
-          System.err.println(msg);
-          throw new Error(msg);
-        }
-      }
-      dest_map.put(dest_var_name, dest_var);
+      dest_map.put(dest_var.getName(), dest_var);
     }
 
     // Get the variable sets for the source
@@ -2555,9 +2375,7 @@ public final class DCRuntime implements ComparabilityProvider {
    * @param field_num which field within obj to store into
    */
   public static void push_field_tag(Object obj, int field_num) {
-    if (debug) {
-      System.out.printf("In push_field_tag%n");
-    }
+    if (debug) System.out.printf("In push_field_tag%n");
     // Since instance variables by default initialize to zero, any field
     // can possibly be read before it is set.
     push_field_tag_null_ok(obj, field_num);
@@ -2608,9 +2426,7 @@ public final class DCRuntime implements ComparabilityProvider {
         debug_primitive.log("push_field_tag %s %d = %s%n", obj_str(obj), field_num, tag);
       }
     }
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /**
@@ -2651,21 +2467,17 @@ public final class DCRuntime implements ComparabilityProvider {
       debug_primitive.log(
           "pop_field_tag (%s %d = %s%n", obj_str(obj), field_num, obj_tags[field_num]);
     }
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
-  /** Returns the number of primitive fields in clazz and all of its superclasses. */
+  /** Return the number of primitive fields in clazz and all of its superclasses. */
   public static int num_prim_fields(Class<?> clazz) {
     if (clazz == Object.class) {
       return 0;
     } else {
       int field_cnt = num_prim_fields(clazz.getSuperclass());
       for (Field f : clazz.getDeclaredFields()) {
-        if (f.getType().isPrimitive()) {
-          field_cnt++;
-        }
+        if (f.getType().isPrimitive()) field_cnt++;
       }
       return field_cnt;
     }
@@ -2684,9 +2496,7 @@ public final class DCRuntime implements ComparabilityProvider {
     Object tag1 = td.tag_stack.pop();
     assert td.tag_stack.peek() != method_marker;
     TagEntry.union(tag1, td.tag_stack.peek());
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /**
@@ -2701,9 +2511,7 @@ public final class DCRuntime implements ComparabilityProvider {
     Object tag1 = td.tag_stack.pop();
     assert td.tag_stack.peek() != method_marker;
     TagEntry.union(tag1, td.tag_stack.pop());
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
     // debug_print_call_stack();
   }
 
@@ -2713,9 +2521,7 @@ public final class DCRuntime implements ComparabilityProvider {
     debug_primitive.log("dup%n");
     assert td.tag_stack.peek() != method_marker;
     td.tag_stack.push(td.tag_stack.peek());
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /** Handles a dup_x1 opcode on a primitive. */
@@ -2729,9 +2535,7 @@ public final class DCRuntime implements ComparabilityProvider {
     td.tag_stack.push(top);
     td.tag_stack.push(nxt);
     td.tag_stack.push(top);
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /**
@@ -2750,9 +2554,7 @@ public final class DCRuntime implements ComparabilityProvider {
     td.tag_stack.push(tag2);
     td.tag_stack.push(tag1);
     td.tag_stack.push(top);
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /** Handles a dup2 opcode on a primitive. */
@@ -2767,9 +2569,7 @@ public final class DCRuntime implements ComparabilityProvider {
     td.tag_stack.push(top);
     td.tag_stack.push(tag1);
     td.tag_stack.push(top);
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /** Handles a dup2_x1 opcode on a primitive. */
@@ -2787,9 +2587,7 @@ public final class DCRuntime implements ComparabilityProvider {
     td.tag_stack.push(tag2);
     td.tag_stack.push(tag1);
     td.tag_stack.push(top);
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /** Handles a dup2_x2 opcode on a primitive. */
@@ -2810,12 +2608,10 @@ public final class DCRuntime implements ComparabilityProvider {
     td.tag_stack.push(tag2);
     td.tag_stack.push(tag1);
     td.tag_stack.push(top);
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
-  /** Swaps the two elements on the top of the tag stack. */
+  /** swaps the two elements on the top of the tag stack */
   public static void swap() {
     ThreadData td = thread_to_data.get(Thread.currentThread());
     debug_primitive.log("swap%n");
@@ -2825,9 +2621,7 @@ public final class DCRuntime implements ComparabilityProvider {
     Object tag1 = td.tag_stack.pop();
     td.tag_stack.push(top);
     td.tag_stack.push(tag1);
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /**
@@ -2862,9 +2656,7 @@ public final class DCRuntime implements ComparabilityProvider {
     assert td.tag_stack.peek() != method_marker;
     Object index_tag = td.tag_stack.pop();
     if (arr_ref == null) {
-      if (debug_tag_frame) {
-        System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-      }
+      if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
       return;
     }
     if (debug_arr_index.enabled()) {
@@ -2878,9 +2670,7 @@ public final class DCRuntime implements ComparabilityProvider {
     Object[] obj_tags = field_map.get(arr_ref);
     if (obj_tags != null) {
       Object tag = obj_tags[index];
-      if (tag == null) {
-        obj_tags[index] = tag = new UninitArrayElem();
-      }
+      if (tag == null) obj_tags[index] = tag = new UninitArrayElem();
       td.tag_stack.push(tag);
       if (debug_primitive.enabled()) {
         debug_primitive.log(
@@ -2897,9 +2687,7 @@ public final class DCRuntime implements ComparabilityProvider {
         debug_primitive.log("arrayload null-ok %s[%d] = null%n", obj_str(arr_ref), index);
       }
     }
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
   }
 
   /**
@@ -2915,18 +2703,14 @@ public final class DCRuntime implements ComparabilityProvider {
     // Get the tag for the index and mark it as comparable with the array
     assert td.tag_stack.peek() != method_marker;
     Object index_tag = td.tag_stack.pop();
-    if (debug_tag_frame) {
-      System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-    }
+    if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
     if (arr_ref == null) {
       return;
     }
     if (debug_arr_index.enabled()) {
       debug_arr_index.log("Merging array '%s' and index '%s'", obj_str(arr_ref), index_tag);
     }
-    if (merge_arrays_and_indices) {
-      TagEntry.union(arr_ref, index_tag);
-    }
+    if (merge_arrays_and_indices) TagEntry.union(arr_ref, index_tag);
   }
 
   /**
@@ -2959,7 +2743,7 @@ public final class DCRuntime implements ComparabilityProvider {
   }
 
   /**
-   * Returns true if the specified class is initialized.
+   * Returns whether or not the specified class is initialized.
    *
    * @param clazz class to check
    * @return true if clazz has been initialized
@@ -2967,10 +2751,10 @@ public final class DCRuntime implements ComparabilityProvider {
   @Pure
   public static boolean is_class_initialized(Class<?> clazz) {
     debug_primitive.log("is_class_initialized%n");
-    return initialized_eclassses.contains(clazz.getName());
+    return (initialized_eclassses.contains(clazz.getName()));
   }
 
-  /** Returns the fully-qualified name of the method that called the caller of caller_name(). */
+  /** Returns the name of the method that called the caller of caller_name(). */
   private static String caller_name() {
 
     Throwable stack = new Throwable("caller");
@@ -2980,7 +2764,7 @@ public final class DCRuntime implements ComparabilityProvider {
     if (ste.getClassName().equals("java.lang.DCRuntime")) {
       ste = ste_arr[3];
     }
-    return ste.getClassName() + "." + ste.getMethodName();
+    return (ste.getClassName() + "." + ste.getMethodName());
   }
 
   /**
@@ -3011,7 +2795,7 @@ public final class DCRuntime implements ComparabilityProvider {
       }
       String default_tostring =
           String.format("%s@%s", obj.getClass().getName(), System.identityHashCode(obj));
-      if (tostring != null && tostring.equals(default_tostring)) {
+      if (tostring.equals(default_tostring)) {
         return tostring;
       } else {
         // Limit display of object contents to 60 characters.
@@ -3057,7 +2841,7 @@ public final class DCRuntime implements ComparabilityProvider {
   /** Removes DCompMarker from the signature. */
   public static String clean_decl_name(String decl_name) {
 
-    if (Premain.jdk_instrumented) {
+    if (DCInstrument.jdk_instrumented) {
       jdk_decl_matcher.reset(decl_name);
       return jdk_decl_matcher.replaceFirst("");
     } else {
@@ -3097,7 +2881,8 @@ public final class DCRuntime implements ComparabilityProvider {
       assert fi.isPrimitive();
       Field field = fi.getField();
       Class<?> clazz = field.getDeclaringClass();
-      String name = Premain.tag_method_name(Premain.GET_TAG, clazz.getName(), field.getName());
+      String name =
+          DCInstrument.tag_method_name(DCInstrument.GET_TAG, clazz.getName(), field.getName());
       try {
         get_tag = clazz.getMethod(name);
       } catch (Exception e) {
@@ -3105,7 +2890,7 @@ public final class DCRuntime implements ComparabilityProvider {
       }
     }
 
-    /** Returns the tag associated with this field. */
+    /** Return the tag associated with this field. */
     @Override
     Object get_tag(Object parent, Object obj) {
       Object tag;
@@ -3119,9 +2904,7 @@ public final class DCRuntime implements ComparabilityProvider {
         assert td.tag_stack.peek() != method_marker;
         tag = td.tag_stack.pop();
         assert tag != null;
-        if (debug_tag_frame) {
-          System.out.printf("tag stack size: %d%n", td.tag_stack.size());
-        }
+        if (debug_tag_frame) System.out.printf("tag stack size: %d%n", td.tag_stack.size());
       } catch (Exception e) {
         throw new Error("can't execute tag method " + get_tag, e);
       }
@@ -3171,7 +2954,7 @@ public final class DCRuntime implements ComparabilityProvider {
       }
 
       try {
-        return field.get(null);
+        return (field.get(null));
       } catch (Exception e) {
         throw new RuntimeException("Can't get val for static field " + field, e);
       }

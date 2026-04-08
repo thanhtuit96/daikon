@@ -7,7 +7,6 @@ import org.checkerframework.checker.interning.qual.Interned;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNullIf;
 import org.checkerframework.checker.nullness.qual.Nullable;
-import org.checkerframework.checker.signature.qual.Identifier;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
 import org.plumelib.reflection.ReflectionPlume;
@@ -25,6 +24,9 @@ import org.plumelib.reflection.ReflectionPlume;
 // No "@Deprecated" annotation yet, but we should add it once support for
 // file format 1 is removed from Daikon.
 public class PptName implements Serializable {
+  // We are Serializable, so we specify a version to allow changes to
+  // method signatures without breaking serialization.  If you add or
+  // remove fields, you should change this number to the current date.
   static final long serialVersionUID = 20020122L;
 
   // These are never changed but cannot be declared "final", because they
@@ -35,33 +37,29 @@ public class PptName implements Serializable {
   // fn_name and point together comprise fullname
   /** The part of fullname before ":::" */
   private @Interned String fn_name;
-
   /** Post-separator (separator is ":::") */
   private @Interned String point;
 
-  // cls and methodSignature together comprise fn_name
+  // cls and method together comprise fn_name
   /** Fully-qualified class name. */
   private @Nullable @Interned String cls;
-
   /** Method signature, including types. */
-  private final @Nullable @Interned String methodSignature;
+  private final @Nullable @Interned String method;
 
   // Representation invariant:
   //
   // fullname must contain ":::".
   // fn_name is the part of fullname before ::: and point is the part after.
   // If fn_name does contain a '(' and a '.' that comes before it, then
-  // cls is the portion before the dot and methodSignature is the portion after.
-  // If fn_name contains '(' but no dot, cls is null and methodSignature
+  // cls is the portion before the dot and method is the portion after.
+  // If fn_name contains '(' but no dot, cls is null and method
   // is the same as fn_name.
   // If fn_name does not contain '(', then class is the same as fn_name and
-  // methodSignature is null.
+  // method is null.
 
   // ==================== CONSTRUCTORS ====================
 
-  /**
-   * @param name non-null ppt name as given in the decls file
-   */
+  /** @param name non-null ppt name as given in the decls file */
   public PptName(String name) {
     // If the name is well-formed, like "mvspc.setupGUI()V:::EXIT75",
     // then this constructor will extract the class and method names.
@@ -82,29 +80,29 @@ public class PptName implements Serializable {
     int lparen = fn_name.indexOf('(');
     if (lparen == -1) {
       cls = fn_name;
-      methodSignature = null;
+      method = null;
       return;
     }
     int dot = fn_name.lastIndexOf('.', lparen);
     if (dot == -1) {
-      methodSignature = fn_name;
+      method = fn_name;
       cls = null;
       return;
     }
     // now 0 <= dot < lparen
     cls = fn_name.substring(0, dot).intern();
-    methodSignature = fn_name.substring(dot + 1).intern();
+    method = fn_name.substring(dot + 1).intern();
   }
 
   /**
-   * Creates a new PptName. {@code className} or {@code methodSignature} (or both) must be non-null.
+   * Creates a new PptName. {@code className} or {@code methodName} (or both) must be non-null.
    *
    * @param className fully-qualified class name
-   * @param methodSignature method signature, including types
+   * @param methodName method signature, including types
    * @param pointName post-separator (separator is ":::")
    */
-  public PptName(@Nullable String className, @Nullable String methodSignature, String pointName) {
-    if ((className == null) && (methodSignature == null)) {
+  public PptName(@Nullable String className, @Nullable String methodName, String pointName) {
+    if ((className == null) && (methodName == null)) {
       throw new UnsupportedOperationException("One of class or method must be non-null");
     }
     // First set class name
@@ -112,18 +110,18 @@ public class PptName implements Serializable {
       cls = className.intern();
       fn_name = cls;
     }
-    // Then add method signature
-    if (methodSignature == null) {
-      this.methodSignature = null;
+    // Then add method name
+    if (methodName == null) {
+      method = null;
       if (fn_name == null) {
         throw new RuntimeException("fn_name should not be null; probably bad arguments");
       }
     } else {
-      this.methodSignature = methodSignature.intern();
+      method = methodName.intern();
       if (cls != null) {
-        fn_name = (cls + "." + this.methodSignature).intern();
+        fn_name = (cls + "." + method).intern();
       } else {
-        fn_name = this.methodSignature;
+        fn_name = method;
       }
     }
     assert fn_name != null;
@@ -208,7 +206,7 @@ public class PptName implements Serializable {
    * @return the full name which can uniquely identify a method within a class
    */
   public @Nullable String getSignature() {
-    return methodSignature;
+    return method;
   }
 
   /**
@@ -217,15 +215,13 @@ public class PptName implements Serializable {
    *
    * @return the name (identifier) of the method, or null
    */
-  public @Nullable @Identifier String getMethodName() {
-    if (methodSignature == null) {
+  public @Nullable String getMethodName() {
+    if (method == null) {
       return null;
     }
-    int lparen = methodSignature.indexOf('(');
+    int lparen = method.indexOf('(');
     assert lparen >= 0;
-    @SuppressWarnings("signature:assignment") // string manipulation
-    @Identifier String result = methodSignature.substring(0, lparen);
-    return result;
+    return method.substring(0, lparen);
   }
 
   /**
@@ -237,12 +233,12 @@ public class PptName implements Serializable {
    */
   public @Nullable @Interned String getNameWithoutPoint() {
     return fn_name;
-    // if (cls == null && methodSignature == null) {
+    // if (cls == null && method == null) {
     //   return null;
     // }
-    // if (cls == null) { return methodSignature; }
-    // if (methodSignature == null) { return cls; }
-    // return (cls + "." + methodSignature).intern();
+    // if (cls == null) { return method; }
+    // if (method == null) { return cls; }
+    // return (cls + "." + method).intern();
   }
 
   /**
@@ -274,7 +270,7 @@ public class PptName implements Serializable {
             result = Integer.parseInt(point.substring(i));
             break;
           } catch (NumberFormatException e) {
-            // continue;
+            continue;
           }
         }
       }
@@ -354,7 +350,7 @@ public class PptName implements Serializable {
   @EnsuresNonNullIf(result = true, expression = "point")
   @Pure
   public boolean isNumberedExitPoint() {
-    return (point != null) && (isExitPoint() && !isCombinedExitPoint());
+    return ((point != null) && (isExitPoint() && !isCombinedExitPoint()));
   }
 
   /**
@@ -400,9 +396,9 @@ public class PptName implements Serializable {
   @Pure
   public boolean isConstructor() {
 
-    if (methodSignature != null) {
+    if (method != null) {
 
-      if (methodSignature.startsWith("<init>")) {
+      if (method.startsWith("<init>")) {
         return true;
       }
 
@@ -412,16 +408,16 @@ public class PptName implements Serializable {
 
       @SuppressWarnings("signature") // cls is allowed to be arbitrary, especially for non-Java code
       String class_name = ReflectionPlume.fullyQualifiedNameToSimpleName(cls);
-      assert methodSignature != null; // for nullness checker
-      int arg_start = methodSignature.indexOf('(');
-      String method_name = methodSignature;
+      assert method != null; // for nullness checker
+      int arg_start = method.indexOf('(');
+      String method_name = method;
       if (arg_start != -1) {
-        method_name = methodSignature.substring(0, arg_start);
+        method_name = method.substring(0, arg_start);
       }
 
       // System.out.println ("fullname = " + fullname);
       // System.out.println ("fn_name = " + fn_name);
-      // System.out.println ("methodSignature = " + methodSignature);
+      // System.out.println ("method = " + method);
       // System.out.println ("cls = " + cls);
       // System.out.println ("class_name = " + class_name);
       // System.out.println ("method_name = " + method_name);
@@ -434,11 +430,7 @@ public class PptName implements Serializable {
     return false;
   }
 
-  /**
-   * Debugging output.
-   *
-   * @return a string representation of this
-   */
+  /** Debugging output. */
   public String repr() {
     return "PptName: fullname="
         + fullname
@@ -448,8 +440,8 @@ public class PptName implements Serializable {
         + point
         + "; cls="
         + cls
-        + "; methodSignature="
-        + methodSignature;
+        + "; method="
+        + method;
   }
 
   // ==================== PRODUCERS ====================
@@ -467,7 +459,7 @@ public class PptName implements Serializable {
     assert isExitPoint() : fullname;
 
     assert isExitPoint() || isThrowsPoint();
-    return new PptName(cls, methodSignature, FileIO.enter_suffix);
+    return new PptName(cls, method, FileIO.enter_suffix);
   }
 
   /**
@@ -477,7 +469,7 @@ public class PptName implements Serializable {
    */
   public PptName makeExit() {
     assert isExitPoint() || isEnterPoint() : fullname;
-    return new PptName(cls, methodSignature, FileIO.exit_suffix);
+    return new PptName(cls, method, FileIO.exit_suffix);
   }
 
   /**
@@ -502,7 +494,7 @@ public class PptName implements Serializable {
 
   // ==================== OBJECT METHODS ====================
 
-  // Returns an interned string such that `this.equals(new PptName(this.toString()))`.
+  /* @return interned string such that this.equals(new PptName(this.toString())) */
   @SideEffectFree
   @Override
   public String toString(@GuardSatisfied PptName this) {
@@ -533,22 +525,14 @@ public class PptName implements Serializable {
   private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
     try {
       in.defaultReadObject();
-      if (fullname != null) {
-        fullname = fullname.intern();
+      if (fullname != null) fullname = fullname.intern();
+      if (fn_name != null) fn_name = fn_name.intern();
+      if (cls != null) cls = cls.intern();
+      if (method != null) {
+        // method = method.intern();
+        ReflectionPlume.setFinalField(this, "method", method.intern());
       }
-      if (fn_name != null) {
-        fn_name = fn_name.intern();
-      }
-      if (cls != null) {
-        cls = cls.intern();
-      }
-      if (methodSignature != null) {
-        // methodSignature = methodSignature.intern();
-        ReflectionPlume.setFinalField(this, "methodSignature", methodSignature.intern());
-      }
-      if (point != null) {
-        point = point.intern();
-      }
+      if (point != null) point = point.intern();
     } catch (NoSuchFieldException e) {
       throw new Error(e);
     }

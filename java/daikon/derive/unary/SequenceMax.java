@@ -11,6 +11,9 @@ import org.plumelib.util.Intern;
 
 // like SequenceMin; if one changes, change the other, too
 public final class SequenceMax extends UnaryDerivation {
+  // We are Serializable, so we specify a version to allow changes to
+  // method signatures without breaking serialization.  If you add or
+  // remove fields, you should change this number to the current date.
   static final long serialVersionUID = 20020122L;
 
   // Variables starting with dkconfig_ should only be set via the
@@ -60,6 +63,7 @@ public final class SequenceMax extends UnaryDerivation {
     return (other instanceof SequenceMax);
   }
 
+  /** Returns the ESC name. */
   @SideEffectFree
   @Override
   public String esc_name(String index) {

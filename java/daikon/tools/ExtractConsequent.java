@@ -1,12 +1,11 @@
 package daikon.tools;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.logging.Level.FINE;
-import static java.util.logging.Level.INFO;
 
 import daikon.Daikon;
 import daikon.FileIO;
 import daikon.Global;
+import daikon.LogHelper;
 import daikon.Ppt;
 import daikon.PptMap;
 import daikon.PptTopLevel;
@@ -43,11 +42,6 @@ import org.plumelib.util.StringsPlume;
  * resulting implications are written to standard output in the format of a splitter info file.
  */
 public class ExtractConsequent {
-
-  /** Do not instantiate. */
-  private ExtractConsequent() {
-    throw new Error("Do not instantiate");
-  }
 
   public static final Logger debug = Logger.getLogger("daikon.ExtractConsequent");
   private static final String lineSep = Global.lineSep;
@@ -107,10 +101,10 @@ public class ExtractConsequent {
    * appropriate to be called progrmmatically.
    *
    * @param args command-line arguments, like those of {@link #main}
-   * @throws IOException if there is trouble reading the file
    */
-  public static void mainHelper(final String[] args) throws IOException {
-    daikon.LogHelper.setupLogs(INFO);
+  public static void mainHelper(final String[] args)
+      throws FileNotFoundException, IOException, ClassNotFoundException {
+    daikon.LogHelper.setupLogs(daikon.LogHelper.INFO);
     LongOpt[] longopts =
         new LongOpt[] {
           new LongOpt(Daikon.suppress_redundant_SWITCH, LongOpt.NO_ARGUMENT, null, 0),
@@ -137,7 +131,7 @@ public class ExtractConsequent {
           } else if (Daikon.debugAll_SWITCH.equals(option_name)) {
             Global.debugAll = true;
           } else if (Daikon.debug_SWITCH.equals(option_name)) {
-            daikon.LogHelper.setLevel(Daikon.getOptarg(g), FINE);
+            LogHelper.setLevel(Daikon.getOptarg(g), LogHelper.FINE);
           } else {
             throw new RuntimeException("Unknown long option received: " + option_name);
           }
@@ -238,7 +232,7 @@ public class ExtractConsequent {
         }
       }
 
-      if (!allConds.isEmpty()) {
+      if (allConds.size() > 0) {
         pw.println();
         pw.println("PPT_NAME " + pptname);
         for (String s : allConds) {
@@ -263,20 +257,14 @@ public class ExtractConsequent {
   }
 
   /**
-   * Extract consequents from all implications at a single program point. It only searches for
+   * Extract consequents from a implications at a single program point. It only searches for
    * top-level program points because Implications are produced only at those points.
    */
   public static void extract_consequent_maybe(PptTopLevel ppt, PptMap all_ppts) {
     ppt.simplify_variable_names();
 
     List<Invariant> invs = new ArrayList<>();
-    // Collect Implication invariants at this program point.
-    for (Invariant inv : ppt.invariants_vector()) {
-      if (inv instanceof Implication) {
-        invs.add(inv);
-      }
-    }
-    if (!invs.isEmpty()) {
+    if (invs.size() > 0) {
       String pptname = cleanup_pptname(ppt.name());
       for (Invariant maybe_as_inv : invs) {
         Implication maybe = (Implication) maybe_as_inv;
@@ -301,23 +289,19 @@ public class ExtractConsequent {
           for (int i = 0; i < maybe.ppt.var_infos.length; i++) {
             VarInfo vi = maybe.ppt.var_infos[i];
             if (vi.isDerivedParam()) {
-              // continue;
+              continue;
             }
           }
         }
 
         Invariant consequent = maybe.consequent();
         Invariant predicate = maybe.predicate();
-        Invariant inv;
-        Invariant cluster_inv;
-        boolean cons_uses_cluster = false;
-        boolean pred_uses_cluster = false;
+        Invariant inv, cluster_inv;
+        boolean cons_uses_cluster = false, pred_uses_cluster = false;
         // extract the consequent (predicate) if the predicate
         // (consequent) uses the variable "cluster".  Ignore if they
         // both depend on "cluster"
-        if (consequent.usesVarDerived("cluster")) {
-          cons_uses_cluster = true;
-        }
+        if (consequent.usesVarDerived("cluster")) cons_uses_cluster = true;
         if (predicate.usesVarDerived("cluster")) {
           pred_uses_cluster = true;
         }
@@ -427,16 +411,11 @@ public class ExtractConsequent {
     return false;
   }
 
-  /**
-   * Remove non-word characters and everything after "(" (which includes everything after ":::")
-   * from the program point name, leaving "PackageName.ClassName.MethodName".
-   *
-   * @param pptname a program point name
-   * @return the argument, without non-word characters and without parens or ":::" suffix
-   */
+  // remove non-word characters and everything after ":::" from the
+  // program point name, leaving PackageName.ClassName.MethodName
   private static String cleanup_pptname(String pptname) {
     int index;
-    if ((index = pptname.indexOf('(')) > 0) {
+    if ((index = pptname.indexOf("(")) > 0) {
       pptname = pptname.substring(0, index);
     }
 
@@ -476,19 +455,12 @@ public class ExtractConsequent {
   private static boolean contains_exactly_one(String string, Pattern pattern) {
     Matcher m = pattern.matcher(string);
     // return true if first call returns true and second returns false
-    return m.find() && !m.find();
+    return (m.find() && !m.find());
   }
 
-  static Pattern orig_pattern;
-  static Pattern dot_class_pattern;
-  static Pattern non_word_pattern;
-  static Pattern gteq_pattern;
-  static Pattern lteq_pattern;
-  static Pattern neq_pattern;
-  static Pattern inequality_pattern;
-  static Pattern contradict_inv_pattern;
-  static Pattern useless_inv_pattern_1;
-  static Pattern useless_inv_pattern_2;
+  static Pattern orig_pattern, dot_class_pattern, non_word_pattern;
+  static Pattern gteq_pattern, lteq_pattern, neq_pattern, inequality_pattern;
+  static Pattern contradict_inv_pattern, useless_inv_pattern_1, useless_inv_pattern_2;
 
   static {
     try {

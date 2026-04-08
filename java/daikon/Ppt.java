@@ -7,7 +7,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.StringJoiner;
 import org.checkerframework.checker.initialization.qual.UnknownInitialization;
 import org.checkerframework.checker.interning.qual.UsesObjectEquals;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
@@ -36,6 +35,9 @@ import org.checkerframework.dataflow.qual.SideEffectFree;
 // The common interface for all Ppt objects.
 @UsesObjectEquals
 public abstract class Ppt implements Serializable {
+  // We are Serializable, so we specify a version to allow changes to
+  // method signatures without breaking serialization.  If you add or
+  // remove fields, you should change this number to the current date.
   static final long serialVersionUID = 20040914L;
 
   // Not final:  modified by PptTopLevel.addVarInfos (which is called by
@@ -66,21 +68,25 @@ public abstract class Ppt implements Serializable {
   @SuppressWarnings("all:purity") // Impure side effects do not escape (string creation)
   @SideEffectFree
   public static String varNames(VarInfo[] infos) {
-    StringJoiner sj = new StringJoiner(", ", "(", ")");
+    StringBuilder sb = new StringBuilder();
+    sb.append("(");
     if (infos.length == 0) {
-      sj.add("<implication slice>");
+      sb.append("<implication slice>");
     } else {
-      for (VarInfo vi : infos) {
-        sj.add(vi.name());
+      sb.append(infos[0].name());
+      for (int i = 1; i < infos.length; i++) {
+        sb.append(", ");
+        sb.append(infos[i].name());
       }
     }
-    return sj.toString();
+    sb.append(")");
+    return sb.toString();
   }
 
-  /** Returns a string representation of the variable names. */
+  /** Return a string representation of the variable names. */
   @SideEffectFree
   public String varNames(@GuardSatisfied @UnknownInitialization(Ppt.class) Ppt this) {
-    return varNames(var_infos);
+    return (varNames(var_infos));
   }
 
   /**

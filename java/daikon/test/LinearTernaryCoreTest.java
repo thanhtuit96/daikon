@@ -1,21 +1,20 @@
 package daikon.test;
 
-import static java.util.logging.Level.INFO;
 import static org.junit.Assert.assertEquals;
 
 import daikon.FileIO;
+import daikon.LogHelper;
 import daikon.inv.OutputFormat;
 import daikon.inv.ternary.threeScalar.LinearTernaryCore;
+import junit.framework.*;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-/** Daikon unit test class. */
 public class LinearTernaryCoreTest {
 
-  /** prepare for tests */
   @BeforeClass
   public static void setUpClass() {
-    daikon.LogHelper.setupLogs(INFO);
+    daikon.LogHelper.setupLogs(LogHelper.INFO);
     FileIO.new_decl_format = true;
   }
 

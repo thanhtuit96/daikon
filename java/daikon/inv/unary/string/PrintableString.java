@@ -20,6 +20,9 @@ import typequals.prototype.qual.Prototype;
  * (tab).
  */
 public final class PrintableString extends SingleString {
+  // We are Serializable, so we specify a version to allow changes to
+  // method signatures without breaking serialization.  If you add or
+  // remove fields, you should change this number to the current date.
   static final long serialVersionUID = 20061016L;
 
   /** Boolean. True iff PrintableString invariants should be considered. */
@@ -40,17 +43,19 @@ public final class PrintableString extends SingleString {
     return proto;
   }
 
+  /** returns whether or not this invariant is enabled */
   @Override
   public boolean enabled() {
     return dkconfig_enabled;
   }
 
+  /** instantiate an invariant on the specified slice */
   @Override
   public PrintableString instantiate_dyn(@Prototype PrintableString this, PptSlice slice) {
     return new PrintableString(slice);
   }
 
-  /** Returns description of invariant. Only Daikon format is implemented. */
+  /** Return description of invariant. Only Daikon format is implemented. */
   @SideEffectFree
   @Override
   public String format_using(@GuardSatisfied PrintableString this, OutputFormat format) {
@@ -61,13 +66,13 @@ public final class PrintableString extends SingleString {
     }
   }
 
-  /** Check to see if a only contains printable ASCII characters. */
+  /** Check to see if a only contains printable ascii characters. */
   @Override
   public InvariantStatus add_modified(@Interned String a, int count) {
     return check_modified(a, count);
   }
 
-  /** Check to see if a only contains printable ASCII characters. */
+  /** Check to see if a only contains printable ascii characters. */
   @Override
   public InvariantStatus check_modified(@Interned String a, int count) {
     for (int ii = 0; ii < a.length(); ii++) {
@@ -93,8 +98,8 @@ public final class PrintableString extends SingleString {
   }
 
   /**
-   * Returns true if this is obvious statically. The only check is for static constants which are
-   * obviously printable (or not) from their values.
+   * Returns whether or not this is obvious statically. The only check is for static constants which
+   * are obviously printable (or not) from their values.
    */
   @Pure
   @Override

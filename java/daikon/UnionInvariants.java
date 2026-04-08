@@ -1,7 +1,6 @@
 package daikon;
 
-import gnu.getopt.Getopt;
-import gnu.getopt.LongOpt;
+import gnu.getopt.*;
 import java.io.File;
 import org.plumelib.util.FilesPlume;
 import org.plumelib.util.StringsPlume;
@@ -89,7 +88,7 @@ public final class UnionInvariants {
             throw new Daikon.UserError("Cannot write to serialization output file " + inv_file);
           }
           break;
-        //
+          //
         case '?':
           break; // getopt() already printed an error
         default:
@@ -150,7 +149,7 @@ public final class UnionInvariants {
   public static void union(PptMap collector, PptMap source) {
     for (PptTopLevel ppt : source.pptIterable()) {
 
-      if ((ppt.numViews() == 0) && ppt.joiner_view.invs.isEmpty()) {
+      if ((ppt.numViews() == 0) && (ppt.joiner_view.invs.size() == 0)) {
         continue;
       }
 

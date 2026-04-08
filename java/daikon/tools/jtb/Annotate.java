@@ -1,8 +1,6 @@
 package daikon.tools.jtb;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.logging.Level.FINE;
-import static java.util.logging.Level.INFO;
 
 import daikon.*;
 import daikon.inv.OutputFormat;
@@ -28,11 +26,6 @@ import org.plumelib.util.StringsPlume;
  * .java} file under the current directory.
  */
 public class Annotate {
-
-  /** Do not instantiate. */
-  private Annotate() {
-    throw new Error("Do not instantiate");
-  }
 
   // ESC format: Invariants are inserted as follows:
   //  * invariants at method entry become "requires"
@@ -168,7 +161,7 @@ public class Annotate {
           } else if (Daikon.debugAll_SWITCH.equals(option_name)) {
             Global.debugAll = true;
           } else if (Daikon.debug_SWITCH.equals(option_name)) {
-            daikon.LogHelper.setLevel(Daikon.getOptarg(g), FINE);
+            LogHelper.setLevel(Daikon.getOptarg(g), LogHelper.FINE);
           } else if (Daikon.format_SWITCH.equals(option_name)) {
             String format_name = Daikon.getOptarg(g);
             Daikon.output_format = OutputFormat.get(format_name);
@@ -190,13 +183,13 @@ public class Annotate {
         case 'i':
           insert_inexpressible = true;
           break;
-        // case 'r':
-        //   // Should do this witout calling out to the system.  (There must be
-        //   // an easy way to do this in Java.)
-        //   Process p = System.exec("find . -type f -name '*.java' -print");
-        //   p.waitFor();
-        //   StringBuilderInputStream sbis
-        //   break;
+          // case 'r':
+          //   // Should do this witout calling out to the system.  (There must be
+          //   // an easy way to do this in Java.)
+          //   Process p = System.exec("find . -type f -name '*.java' -print");
+          //   p.waitFor();
+          //   StringBuilderInputStream sbis
+          //   break;
         case 's':
           slashslash = true;
           break;
@@ -209,7 +202,7 @@ public class Annotate {
     }
 
     // Set up debug traces; note this comes after reading command line options.
-    daikon.LogHelper.setupLogs(Global.debugAll ? FINE : INFO);
+    LogHelper.setupLogs(Global.debugAll ? LogHelper.FINE : LogHelper.INFO);
 
     // The index of the first non-option argument -- the name of the .inv file
     int argindex = g.getOptind();
@@ -246,25 +239,31 @@ public class Annotate {
         throw new Error("unsupported output file format " + Daikon.output_format);
       }
       // outputFile.getParentFile().mkdirs();
-      try (Writer output = Files.newBufferedWriter(outputFile.toPath(), UTF_8)) {
+      Writer output = Files.newBufferedWriter(outputFile.toPath(), UTF_8);
 
-        debug.fine("Parsing file " + javafilename);
+      debug.fine("Parsing file " + javafilename);
 
-        // Annotate the file
-        Node root;
-        try (Reader input = Files.newBufferedReader(Paths.get(javafilename), UTF_8)) {
-          JavaParser parser = new JavaParser(input);
-          root = parser.CompilationUnit();
-        } catch (FileNotFoundException e) {
-          throw new Error(e);
-        } catch (ParseException e) {
-          // e.printStackTrace();
-          System.err.println(javafilename + ": " + e);
-          throw new Daikon.UserError("ParseException in applyVisitorInsertComments");
-        }
+      // Annotate the file
+      Reader input;
+      try {
+        input = Files.newBufferedReader(Paths.get(javafilename), UTF_8);
+      } catch (FileNotFoundException e) {
+        throw new Error(e);
+      }
 
-        debug.fine("Processing file " + javafilename);
+      JavaParser parser = new JavaParser(input);
+      Node root;
+      try {
+        root = parser.CompilationUnit();
+      } catch (ParseException e) {
+        // e.printStackTrace();
+        System.err.println(javafilename + ": " + e);
+        throw new Daikon.UserError("ParseException in applyVisitorInsertComments");
+      }
 
+      debug.fine("Processing file " + javafilename);
+
+      try {
         Ast.applyVisitorInsertComments(
             javafilename,
             root,
@@ -547,7 +546,7 @@ public class Annotate {
 // --------------
 //
 //    Contracts are inherited. If the derived class or overriding method doesn't
-// define a contract, it inherits that of the superclass or interface.
+// define a contract, it inherits that of the super class or interface.
 //    Note that a contract of $none implies that the super contract is applied.
 //
 //    If an overriding method does define a contract then it can only:

@@ -39,20 +39,9 @@ public class Chicory {
   @Option("-v Print progress information")
   public static boolean verbose = false;
 
-  /**
-   * Dump the instrumented classes to disk, for diagnostic purposes. The directory is specified by
-   * {@code --debug-dir} (default {@code debug}).
-   */
-  @Option("Dump the instrumented classes to disk")
-  public static boolean dump = false;
-
-  /** Output debugging information. */
-  @Option("-d Output debugging information (implies --dump)")
+  /** Print debug information and save instrumented classes. */
+  @Option("-d Print debug information and save instrumented classes")
   public static boolean debug = false;
-
-  /** The directory in which to dump instrumented class files. */
-  @Option("Directory in which to create debug files")
-  public static File debug_dir = new File("debug");
 
   /** File in which to put dtrace output. */
   @Option("File in which to put dtrace output")
@@ -78,11 +67,9 @@ public class Chicory {
   @Option("Send trace information to Daikon over a socket")
   public static boolean daikon_online = false;
 
-  // TODO: splitting on whitespace is error-prone.
   /**
    * Specifies Daikon arguments to be used if Daikon is run on a generated trace file {@code
-   * --daikon} or online via a socket {@code --daikon-online}. These arguments will be split on
-   * whitespace.
+   * --daikon} or online via a socket {@code --daikon-online}.
    */
   @Option("Specify Daikon arguments for either --daikon or --daikon-online")
   public static String daikon_args = "";
@@ -91,7 +78,7 @@ public class Chicory {
   // for Daikon separately.
   /** Heap size for the target program, and for Daikon if Daikon is run. */
   @Option("Size of the heap for the target program, and for Daikon if it is run")
-  public static String heap_size = "7g";
+  public static String heap_size = "3600m";
 
   /**
    * Path to Java agent jar file that performs the transformation. The "main" procedure is {@link
@@ -179,14 +166,14 @@ public class Chicory {
   /** starting time (msecs) */
   public static long start = System.currentTimeMillis();
 
-  /** daikon process for {@code --daikon} command-line option. */
+  /** daikon process for {@code --daikon} command-line option */
   // non-null if either daikon==true or daikon_online==true
   public static @MonotonicNonNull Process daikon_proc;
 
   private static final String traceLimTermString = "DTRACELIMITTERMINATE";
   private static final String traceLimString = "DTRACELIMIT";
 
-  /** Flag to use if we want to turn on the static initialization checks. */
+  /** flag to use if we want to turn on the static initialization checks */
   public static final boolean checkStaticInit = true;
 
   private static final boolean RemoteDebug = false;
@@ -259,7 +246,7 @@ public class Chicory {
   }
 
   /**
-   * Returns true iff argument was given to run a purity analysis.
+   * Return true iff argument was given to run a purity analysis.
    *
    * <p>You should only call this after parsing arguments.
    */
@@ -267,7 +254,7 @@ public class Chicory {
     return purityAnalysis;
   }
 
-  /** Returns true iff a file name was specified to supply pure method names. */
+  /** Return true iff a file name was specified to supply pure method names. */
   @Pure
   public static @Nullable File get_purity_file() {
     return purity_file;
@@ -296,20 +283,20 @@ public class Chicory {
       cp = ".";
     }
 
-    // The separator for items in the class path
-    basic.log("File.pathSeparator = %s%n", File.pathSeparator);
-    if (!RegexUtil.isRegex(File.pathSeparator)) {
-      // This can't happen, at least on Unix & Windows.
+    // The the separator for items in the class path
+    String path_separator = System.getProperty("path.separator");
+    basic.log("path_separator = %s%n", path_separator);
+    if (!RegexUtil.isRegex(path_separator)) {
       throw new Daikon.UserError(
           "Bad regexp "
-              + File.pathSeparator
+              + path_separator
               + " for path.separator: "
-              + RegexUtil.regexError(File.pathSeparator));
+              + RegexUtil.regexError(path_separator));
     }
 
     // Look for ChicoryPremain.jar along the classpath
     if (premain == null) {
-      String[] cpath = cp.split(File.pathSeparator);
+      String[] cpath = cp.split(path_separator);
       for (String path : cpath) {
         File poss_premain = new File(path, "ChicoryPremain.jar");
         if (poss_premain.canRead()) {
@@ -323,7 +310,8 @@ public class Chicory {
     String daikon_dir = System.getenv("DAIKONDIR");
     if (premain == null) {
       if (daikon_dir != null) {
-        File poss_premain = new File(new File(daikon_dir, "java"), "ChicoryPremain.jar");
+        String file_separator = System.getProperty("file.separator");
+        File poss_premain = new File(daikon_dir + file_separator + "java", "ChicoryPremain.jar");
         if (poss_premain.canRead()) {
           premain = poss_premain;
         }
@@ -332,7 +320,7 @@ public class Chicory {
 
     // If not found, try the daikon.jar file itself
     if (premain == null) {
-      for (String path : cp.split(File.pathSeparator)) {
+      for (String path : cp.split(path_separator)) {
         File poss_premain = new File(path);
         if (poss_premain.getName().equals("daikon.jar")) {
           if (poss_premain.canRead()) {
@@ -356,8 +344,9 @@ public class Chicory {
       System.exit(1);
     }
 
-    String dtraceLim = System.getProperty(traceLimString);
-    String terminate = System.getProperty(traceLimTermString);
+    String dtraceLim, terminate;
+    dtraceLim = System.getProperty(traceLimString);
+    terminate = System.getProperty(traceLimTermString);
 
     // Run Daikon if we're in online mode
     StreamRedirectThread daikon_err = null;
@@ -414,14 +403,10 @@ public class Chicory {
     cmdlist.add("java");
 
     if (RemoteDebug) {
-      cmdlist.add("-Xdebug");
-
-      cmdlist.add("-Xrunjdwp:server=n,transport=dt_socket,address=8000,suspend=y");
-      // cmdlist.add("-Xrunjdwp:server=y,transport=dt_socket,address=4142,suspend=n");
-
-      // cmdlist.add("-Xnoagent");
-      // cmdlist.add("-Xrunjdwp:server=n,transport=dt_socket,address=8000,suspend=n");
-      // cmdlist.add("-Djava.compiler=NONE");
+      // -Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=4142,suspend=n
+      cmdlist.add("-Xdebug -Xrunjdwp:server=n,transport=dt_socket,address=8000,suspend=y");
+      // cmdlist.add("-Xdebug -Xnoagent
+      // -Xrunjdwp:transport=dt_socket,server=n,suspend=n,address=8000 -Djava.compiler=NONE");
     }
 
     cmdlist.add("-cp");
@@ -431,9 +416,7 @@ public class Chicory {
     cmdlist.add("-Xmx" + heap_size);
     // cmdlist.add ("-verbose");
 
-    if (dtraceLim != null) {
-      cmdlist.add("-D" + traceLimString + "=" + dtraceLim);
-    }
+    if (dtraceLim != null) cmdlist.add("-D" + traceLimString + "=" + dtraceLim);
     if (terminate != null) {
       cmdlist.add("-D" + traceLimTermString + "=" + terminate);
     }
@@ -452,7 +435,7 @@ public class Chicory {
     if (verbose) {
       System.out.printf("%nExecuting target program: %s%n", args_to_string(cmdlist));
     }
-    String[] cmdline = cmdlist.toArray(new String[0]);
+    String[] cmdline = cmdlist.toArray(new String[cmdlist.size()]);
 
     // Execute the command, sending all output to our streams
     java.lang.Runtime rt = java.lang.Runtime.getRuntime();
@@ -464,6 +447,10 @@ public class Chicory {
       System.exit(1);
       throw new Error("Unreachable control flow");
     }
+
+    StreamRedirectThread stdin_thread =
+        new StreamRedirectThread("stdin", System.in, chicory_proc.getOutputStream(), false);
+    stdin_thread.start();
 
     int targetResult = redirect_wait(chicory_proc);
 
@@ -534,46 +521,37 @@ public class Chicory {
       cp = ".";
     }
 
-    List<String> cmd = new ArrayList<>();
-    cmd.add("java");
-    cmd.add("-Xmx" + heap_size);
-    cmd.add("-cp");
-    cmd.add(cp);
-    cmd.add("-ea");
-    cmd.add("daikon.Daikon");
-    if (!daikon_args.trim().isEmpty()) {
-      for (String arg : daikon_args.split(" +")) {
-        cmd.add(arg);
-      }
-    }
+    String cmdstr;
     if (daikon_online) {
-      cmd.add("+");
+      cmdstr =
+          String.format("java -Xmx%s -cp %s -ea daikon.Daikon %s +", heap_size, cp, daikon_args);
     } else {
-      cmd.add(output_dir + File.separator + dtrace_file);
+      cmdstr =
+          String.format(
+              "java -Xmx%s -cp %s -ea daikon.Daikon %s %s/%s",
+              heap_size, cp, daikon_args, output_dir, dtrace_file);
     }
 
-    // System.out.println("daikon command cmd " + cmd);
+    // System.out.println("daikon command is " + daikon_cmd);
+    // System.out.println("daikon command cmdstr " + cmdstr);
 
     if (verbose) {
-      System.out.printf("%nExecuting daikon: %s%n", cmd);
+      System.out.printf("%nExecuting daikon: %s%n", cmdstr);
     }
 
     try {
-      daikon_proc = rt.exec(cmd.toArray(new String[0]));
+      daikon_proc = rt.exec(cmdstr);
     } catch (Exception e) {
-      System.out.printf("Exception '%s' while executing '%s'%n", e, cmd);
+      System.out.printf("Exception '%s' while executing '%s'%n", e, cmdstr);
       System.exit(1);
     }
   }
 
-  /**
-   * Wait for daikon to complete and return its exit status.
-   *
-   * @return the exit status of Daikon
-   */
+  /** Wait for daikon to complete and return its exit status. */
   @RequiresNonNull("daikon_proc")
   private int waitForDaikon() {
-    return redirect_wait(daikon_proc);
+    int result = redirect_wait(daikon_proc);
+    return result;
   }
 
   /**
@@ -585,14 +563,12 @@ public class Chicory {
   public int redirect_wait(Process p) {
 
     // Create the redirect threads and start them.
-    StreamRedirectThread in_thread =
-        new StreamRedirectThread("stdin", System.in, p.getOutputStream(), false);
     StreamRedirectThread err_thread =
-        new StreamRedirectThread("stderr", p.getErrorStream(), System.err, true);
-    StreamRedirectThread out_thread =
-        new StreamRedirectThread("stdout", p.getInputStream(), System.out, true);
+        new StreamRedirectThread("stderr", p.getErrorStream(), System.err);
 
-    in_thread.start();
+    StreamRedirectThread out_thread =
+        new StreamRedirectThread("stdout", p.getInputStream(), System.out);
+
     err_thread.start();
     out_thread.start();
 
@@ -619,32 +595,27 @@ public class Chicory {
   }
 
   /**
-   * Returns string representation of elapsed time since the start of the program.
+   * Returns elapsed time since the start of the program.
    *
-   * @return string representation of elapsed time since the start of the program
+   * @return elapsed time since the start of the program
    */
   public static String elapsed() {
-    return "[" + (System.currentTimeMillis() - start) + " msec]";
+    return ("[" + (System.currentTimeMillis() - start) + " msec]");
   }
 
-  /**
-   * Returns number of milliseconds since the start of the program.
-   *
-   * @return number of milliseconds since the start of the program
-   */
   public static long elapsed_msecs() {
-    return System.currentTimeMillis() - start;
+    return (System.currentTimeMillis() - start);
   }
 
   /** Convert a list of arguments into a command-line string. Only used for debugging output. */
   public String args_to_string(List<String> args) {
     String str = "";
     for (String arg : args) {
-      if (arg.indexOf(' ') != -1) {
+      if (arg.indexOf(" ") != -1) {
         str = "'" + str + "'";
       }
       str += arg + " ";
     }
-    return str.trim();
+    return (str.trim());
   }
 }

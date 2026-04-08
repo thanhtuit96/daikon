@@ -69,6 +69,9 @@ import typequals.prototype.qual.Prototype;
  * {@code x[] is a subset of y[]} or as {@code x[] is a superset of y[]}.
  */
 public class SUBSET extends TWOSEQUENCE {
+  // We are Serializable, so we specify a version to allow changes to
+  // method signatures without breaking serialization.  If you add or
+  // remove fields, you should change this number to the current date.
   static final long serialVersionUID = 20031024L;
 
   private static final Logger debug =
@@ -94,6 +97,7 @@ public class SUBSET extends TWOSEQUENCE {
     return proto;
   }
 
+  /** returns whether or not this invariant is enabled */
   @Override
   public boolean enabled() {
     return dkconfig_enabled;
@@ -132,6 +136,7 @@ public class SUBSET extends TWOSEQUENCE {
     return true;
   }
 
+  /** instantiates the invariant on the specified slice */
   @Override
   public SUBSET instantiate_dyn(@Prototype SUBSET this, PptSlice slice) {
     return new SUBSET(slice);
@@ -304,9 +309,6 @@ public class SUBSET extends TWOSEQUENCE {
 
   @Override
   protected double computeConfidence() {
-    if (ppt.num_samples() == 0) {
-      return Invariant.CONFIDENCE_UNJUSTIFIED;
-    }
     return Invariant.CONFIDENCE_JUSTIFIED;
   }
 
@@ -331,8 +333,7 @@ public class SUBSET extends TWOSEQUENCE {
       return di;
     }
 
-    VarInfo subvar;
-    VarInfo supervar;
+    VarInfo subvar, supervar;
     #if (defined(SUB) || defined(SUBFLOAT))
     subvar = var1;
     supervar = var2;
@@ -389,7 +390,7 @@ public class SUBSET extends TWOSEQUENCE {
   /** returns the ni-suppressions for SUBSET */
   @Pure
   @Override
-  public NISuppressionSet get_ni_suppressions() {
+  public @NonNull NISuppressionSet get_ni_suppressions() {
     if (suppressions == null) {
       NISuppressee suppressee = new NISuppressee(SUBSET.class, 2);
 

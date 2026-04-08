@@ -30,6 +30,9 @@ import org.plumelib.util.ArraysPlume;
  * There would be 4 ternary slices -- for {A,B,C}, {A,B,D}, {A,C,D}, and {B,C,D}.
  */
 public abstract class PptSlice extends Ppt {
+  // We are Serializable, so we specify a version to allow changes to
+  // method signatures without breaking serialization.  If you add or
+  // remove fields, you should change this number to the current date.
   static final long serialVersionUID = 20040921L;
 
   // Permit subclasses to use it.
@@ -57,7 +60,6 @@ public abstract class PptSlice extends Ppt {
    * particular, subclasses such as PptSlice0 need to synchronize it with other values. Therefore,
    * it should be manipulated via {@link #addInvariant} and {@link #removeInvariant}.
    */
-  @SuppressWarnings("serial")
   public List<Invariant> invs;
 
   PptSlice(PptTopLevel parent, VarInfo[] var_infos) {
@@ -134,19 +136,13 @@ public abstract class PptSlice extends Ppt {
   // and to take action if the vector becomes void.
   public void removeInvariant(Invariant inv) {
 
-    if (Debug.logDetail()) {
-      log("Removing invariant '" + inv.format() + "'");
-    }
-    if (Debug.logOn()) {
-      inv.log("Removed from slice: %s", inv.format());
-    }
+    if (Debug.logDetail()) log("Removing invariant '" + inv.format() + "'");
+    if (Debug.logOn()) inv.log("Removed from slice: %s", inv.format());
     boolean removed = invs.remove(inv);
     assert removed : "inv " + inv + " not in ppt " + name();
     Global.falsified_invariants++;
-    if (invs.isEmpty()) {
-      if (Debug.logDetail()) {
-        log("last invariant removed");
-      }
+    if (invs.size() == 0) {
+      if (Debug.logDetail()) log("last invariant removed");
     }
   }
 
@@ -163,10 +159,8 @@ public abstract class PptSlice extends Ppt {
       invs.removeAll(to_remove);
       assert old_invs_size - invs.size() == to_remove.size();
       Global.falsified_invariants += to_remove.size();
-      if (invs.isEmpty()) {
-        if (Debug.logDetail()) {
-          log("last invariant removed");
-        }
+      if (invs.size() == 0) {
+        if (Debug.logDetail()) log("last invariant removed");
       }
     }
   }
@@ -194,10 +188,10 @@ public abstract class PptSlice extends Ppt {
     }
   }
 
-  /** Returns an approximation of the number of samples seen on this slice. */
+  /** Return an approximation of the number of samples seen on this slice. */
   public abstract int num_samples(@UnknownInitialization @GuardSatisfied PptSlice this);
 
-  /** Returns an approximation of the number of distinct values seen on this slice. */
+  /** Return an approximation of the number of distinct values seen on this slice. */
   public abstract int num_values();
 
   /** Instantiate invariants on the VarInfos this slice contains. */
@@ -245,14 +239,9 @@ public abstract class PptSlice extends Ppt {
     }
   }
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // Invariant guarding
+  ///////////////////////////////////////////////////////////////////////////
+  /// Invariant guarding
 
-  /**
-   * Returns true if every invariant is a guarding predicate.
-   *
-   * @return true if every invariant is a guarding predicate
-   */
   public boolean containsOnlyGuardingPredicates() {
     for (Invariant inv : invs) {
       if (!inv.isGuardingPredicate) {
@@ -262,19 +251,17 @@ public abstract class PptSlice extends Ppt {
     return true;
   }
 
-  // ///////////////////////////////////////////////////////////////////////////
-  // Miscellaneous
+  ///////////////////////////////////////////////////////////////////////////
+  /// Miscellaneous
 
   /** Remove the invariants noted in omitTypes. */
   public void processOmissions(boolean[] omitTypes) {
-    if (invs.isEmpty()) {
+    if (invs.size() == 0) {
       return;
     }
     List<Invariant> toRemove = new ArrayList<>();
     for (Invariant inv : invs) {
-      if (omitTypes['r'] && inv.isReflexive()) {
-        toRemove.add(inv);
-      }
+      if (omitTypes['r'] && inv.isReflexive()) toRemove.add(inv);
     }
     removeInvariants(toRemove);
   }
@@ -302,12 +289,7 @@ public abstract class PptSlice extends Ppt {
 
     for (Invariant inv : invs) {
       inv.repCheck();
-      if (inv.ppt != this) {
-        throw new Error(
-            String.format(
-                "inv.ppt != this.  inv.ppt=%s;  this=%s;  for inv=%s [%s]  in invs=%s",
-                inv.ppt, this, inv, inv.getClass(), invs));
-      }
+      assert inv.ppt == this;
     }
   }
 
@@ -340,16 +322,15 @@ public abstract class PptSlice extends Ppt {
     return this.getClass().getName()
         + ": "
         + parent.ppt_name
-        // sb starts with a space
+        + " "
         + sb
         + " samples: "
         + num_samples();
   }
-
   /**
-   * Returns true if this slice already contains the specified invariant. Whether not invariants
-   * match is determine by Invariant.match() This will return true for invariants of the same kind
-   * with different formulas (eg, one_of, bound, linearbinary).
+   * Returns whether or not this slice already contains the specified invariant. Whether not
+   * invariants match is determine by Invariant.match() This will return true for invariants of the
+   * same kind with different formulas (eg, one_of, bound, linearbinary).
    */
   public boolean contains_inv(Invariant inv) {
 
@@ -362,8 +343,8 @@ public abstract class PptSlice extends Ppt {
   }
 
   /**
-   * Returns true if this slice contains an exact match for the specified invariant. An exact match
-   * requires that the invariants be of the same class and have the same formula.
+   * Returns whether or not this slice contains an exact match for the specified invariant. An exact
+   * match requires that the invariants be of the same class and have the same formula.
    */
   @EnsuresNonNullIf(result = true, expression = "find_inv_exact(#1)")
   public boolean contains_inv_exact(Invariant inv) {

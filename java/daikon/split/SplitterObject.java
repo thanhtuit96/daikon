@@ -32,7 +32,6 @@ public class SplitterObject implements Comparable<SplitterObject> {
   // Not necessarily an error message -- really just a status message.
   private String errorMessage = "Splitter not yet loaded";
   private int guid = -999; // -999 indicates not yet set
-
   /** class file containing compiled code for this splitter */
   private @MonotonicNonNull File classFile;
 
@@ -59,8 +58,6 @@ public class SplitterObject implements Comparable<SplitterObject> {
   }
 
   /**
-   * Returns a Java Class corresponding to the {@code .class} file, or null.
-   *
    * @param fileName the pathname of a {@code .class} file
    * @return a Java Class corresponding to the {@code .class} file, or null
    */
@@ -179,7 +176,7 @@ public class SplitterObject implements Comparable<SplitterObject> {
     this.guid = ID;
   }
 
-  /** Returns the unique ID of this splitterObject. */
+  /** Return the unique ID of this splitterObject. */
   public int getGUID() {
     return this.guid;
   }

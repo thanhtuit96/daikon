@@ -56,7 +56,8 @@ public class SpinfoFile {
   SpinfoFile(File spinfoFile, String tempDir) {
     this.tempDir = tempDir;
     this.spinfoFileName = spinfoFile.toString();
-    try (LineNumberReader reader = FilesPlume.newLineNumberFileReader(spinfoFile)) {
+    try {
+      LineNumberReader reader = FilesPlume.newLineNumberFileReader(spinfoFile);
       parseFile(reader);
     } catch (FileNotFoundException e) {
       throw new RuntimeException(e);
@@ -84,7 +85,7 @@ public class SpinfoFile {
     return splitterObjects;
   }
 
-  /** Returns the number of splitters (SplitterObject objects) represented by this file. */
+  /** Return the number of splitters (SplitterObject objects) represented by this file. */
   public int numSplittterObjects() {
     int result = 0;
     for (SplitterObject[] spa : splitterObjects) {
@@ -94,7 +95,7 @@ public class SpinfoFile {
   }
 
   /**
-   * Returns the number of splitters (SplitterObject objects) represented by all the files in the
+   * Return the number of splitters (SplitterObject objects) represented by all the files in the
    * list.
    */
   public static int numSplittterObjects(List<SpinfoFile> spinfoFiles) {
@@ -200,7 +201,7 @@ public class SpinfoFile {
    * @param spinfoFile a LineNumberReader for the spinfo file being parsed
    * @param pptSections the List into which the List of lines for this pptSection are to be added
    * @param pptName name of the ppt
-   * @throws IOException if an I/O error occurs
+   * @throws IOException if an I/O error occurs.
    */
   private void readPptStatements(
       @UnknownInitialization SpinfoFile this,
@@ -232,7 +233,7 @@ public class SpinfoFile {
     List<SplitterObject[]> splittersForAllPpts = new ArrayList<>();
     for (List<String> pptSection : pptSections) {
       List<SplitterObject> splittersForThisPpt = new ArrayList<>();
-      if (!pptSection.isEmpty()) {
+      if (pptSection.size() > 0) {
         String pptName = pptSection.get(0).trim();
         SplitterObject splitObj = null;
         for (int j = 1; j < pptSection.size(); j++) {
@@ -293,7 +294,7 @@ public class SpinfoFile {
     }
   }
 
-  /** Returns true if the line is blank (or null). */
+  /** Returns whether the line is blank (or null). */
   @EnsuresNonNullIf(result = false, expression = "#1")
   @Pure
   private static boolean isBlank(@Nullable String line) {
@@ -301,20 +302,20 @@ public class SpinfoFile {
   }
 
   /**
-   * Returns true if the line is a spinfo file comment line. A line is a comment if it starts with a
+   * Returns whether the line is a spinfo file comment line. A line is a comment if it starts with a
    * (possibly indented) "#".
    */
   @Pure
   private static boolean isComment(String line) {
-    return line.trim().startsWith("#");
+    return (line.trim().startsWith("#"));
   }
 
   /**
-   * Returns true if the line is a spinfo file formatting command. A line is a formatting command if
+   * Returns whether the line is a spinfo file formatting command. A line is a formatting command if
    * line is indented with a tab ("\t") or spaces (" ").
    */
   @Pure
   private static boolean isFormatting(String line) {
-    return line.startsWith("\t") || line.startsWith(" ");
+    return (line.startsWith("\t") || line.startsWith(" "));
   }
 }

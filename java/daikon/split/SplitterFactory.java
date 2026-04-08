@@ -67,7 +67,7 @@ public class SplitterFactory {
    */
   private static int guid = 0;
 
-  // Methods
+  /// Methods
 
   /**
    * Parses the Splitter info.
@@ -130,7 +130,7 @@ public class SplitterFactory {
             }
             System.out.printf(
                 "%s: %d of %d splitters successful%n", ppt_name, numGood, numsplitters);
-            if (!sp.isEmpty()) {
+            if (sp.size() >= 1) {
               SplitterList.put(ppt_name, sp.toArray(new Splitter[0]));
             }
             // delete this entry in the splitter array to prevent it from
@@ -188,7 +188,8 @@ public class SplitterFactory {
       @SuppressWarnings("signature") // safe, has been quoted
       @BinaryName String fileName_bn = fileName;
       splitObj.setClassName(fileName_bn);
-      try (BufferedWriter writer = FilesPlume.newBufferedFileWriter(fileAddress + ".java")) {
+      try {
+        BufferedWriter writer = FilesPlume.newBufferedFileWriter(fileAddress + ".java");
         if (dkconfig_delete_splitters_on_exit) {
           new File(fileAddress + ".java").deleteOnExit();
           new File(fileAddress + ".class").deleteOnExit();
@@ -243,7 +244,7 @@ public class SplitterFactory {
     return fileCompiler.compileFiles(fileNames);
   }
 
-  /** Returns true if a Ppt's name matches the given pattern. */
+  /** Determine whether a Ppt's name matches the given pattern. */
   private static boolean matchPpt(String ppt_name, PptTopLevel ppt) {
     if (ppt.name.equals(ppt_name)) {
       return true;
@@ -289,7 +290,7 @@ public class SplitterFactory {
    * "myPackage.myClass.someMethod" and guid = 12, then the following would be returned:
    * "myPackage_myClass_someMethod_12".
    *
-   * @param ppt_name the name of the Ppt that the splitter Java file will be used with
+   * @param ppt_name the name of the Ppt that the splitter Java file wil be used with
    */
   private static String getFileName(String ppt_name) {
     String splitterName = clean(ppt_name);
@@ -316,8 +317,7 @@ public class SplitterFactory {
   }
 
   /**
-   * Creates the temporary directory in which splitter files will be stored. The return value
-   * includes a trailing file separtor (e.g., "/"), unless the return value is "".
+   * Creates the temporary directory in which splitter files will be stored.
    *
    * @return the name of the temporary directory. This is where the Splitters are created.
    */

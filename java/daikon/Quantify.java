@@ -5,7 +5,6 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.StringJoiner;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -15,38 +14,33 @@ import org.checkerframework.dataflow.qual.SideEffectFree;
 @SuppressWarnings("UnusedVariable") // messy code, need to investigate later
 public class Quantify {
 
-  /** Do not instantiate. */
-  private Quantify() {
-    throw new Error("Do not instantiate");
-  }
-
   /** Flags describing how quantifications are to be built. */
-  public static enum QuantFlags {
-    /** two indices where they refer to corresponding positions. */
+  public enum QuantFlags {
+    /** two indices where they refer to corresponding positions */
     ELEMENT_WISE,
-    /** two indices where the second is one more than the first. */
+    /** two indices where the second is one more than the first */
     ADJACENT,
-    /** two indices are different. */
+    /** two indices are different */
     DISTINCT,
-    /** Returns the names of the index variables. */
+    /** Return the names of the index variables. */
     INCLUDE_INDEX;
 
-    /** set with just ELEMENT_WISE turned on. */
+    /** set with just ELEMENT_WISE turned on */
     public static EnumSet<QuantFlags> element_wise() {
       return EnumSet.of(QuantFlags.ELEMENT_WISE);
     }
 
-    /** set with just ADJACENT turned on. */
+    /** set with just ADJACENT turned on */
     public static EnumSet<QuantFlags> adjacent() {
       return EnumSet.of(QuantFlags.ADJACENT);
     }
 
-    /** set with just DISTINCT turned on. */
+    /** set with just DISTINCT turned on */
     public static EnumSet<QuantFlags> distinct() {
       return EnumSet.of(QuantFlags.DISTINCT);
     }
 
-    /** set with just INCLUDE_INDEX turned on. */
+    /** set with just INCLUDE_INDEX turned on */
     public static EnumSet<QuantFlags> include_index() {
       return EnumSet.of(QuantFlags.INCLUDE_INDEX);
     }
@@ -137,7 +131,7 @@ public class Quantify {
     @SideEffectFree
     @Override
     public String name(@GuardSatisfied Constant this) {
-      return Integer.toString(val);
+      return "" + val;
     }
 
     public int get_value() {
@@ -325,7 +319,6 @@ public class Quantify {
   public static class QuantifyReturn {
     /** Variable being quantified. */
     public VarInfo var;
-
     /** Index into the variable. If null, variable is not a sequence. */
     public @Nullable Term index;
 
@@ -495,14 +488,13 @@ public class Quantify {
       QuantifyReturn[] qrets = quantify(vars);
 
       // build the forall predicate
-      StringJoiner int_list;
-      StringJoiner conditions;
+      StringBuilder int_list, conditions;
       {
         // "i j ..."
-        int_list = new StringJoiner(" ");
+        int_list = new StringBuilder();
         // "(AND (<= ai i) (<= i bi) (<= aj j) (<= j bj) ...)"
         // if elementwise, also insert "(EQ (- i ai) (- j aj)) ..."
-        conditions = new StringJoiner(" ");
+        conditions = new StringBuilder();
         for (int i = 0; i < qrets.length; i++) {
           Term idx = qrets[i].index;
           if (idx == null) {
@@ -511,9 +503,13 @@ public class Quantify {
           VarInfo vi = qrets[i].var;
           Term low = vi.get_lower_bound();
           Term high = vi.get_upper_bound();
-          int_list.add(idx.simplify_name());
-          conditions.add("(<= " + low.simplify_name() + " " + idx.simplify_name() + ")");
-          conditions.add("(<= " + idx.simplify_name() + " " + high.simplify_name() + ")");
+          if (i != 0) {
+            int_list.append(" ");
+            conditions.append(" ");
+          }
+          int_list.append(idx.simplify_name());
+          conditions.append("(<= " + low.simplify_name() + " " + idx.simplify_name() + ")");
+          conditions.append(" (<= " + idx.simplify_name() + " " + high.simplify_name() + ")");
           if (flags.contains(QuantFlags.ELEMENT_WISE) && (i >= 1)) {
             // Term[] _boundv = qret.bound_vars.get(i-1);
             // Term _idx = _boundv[0], _low = _boundv[1];
@@ -522,10 +518,11 @@ public class Quantify {
             @NonNull Term _idx = qrets[i - 1].index;
             Term _low = qrets[i - 1].var.get_lower_bound();
             if (_low.simplify_name().equals(low.simplify_name())) {
-              conditions.add("(EQ " + _idx.simplify_name() + " " + idx.simplify_name() + ")");
+              conditions.append(" (EQ " + _idx.simplify_name() + " " + idx.simplify_name() + ")");
             } else {
-              conditions.add("(EQ (- " + _idx.simplify_name() + " " + _low.simplify_name() + ")");
-              conditions.add("(- " + idx.simplify_name() + " " + low.simplify_name() + "))");
+              conditions.append(
+                  " (EQ (- " + _idx.simplify_name() + " " + _low.simplify_name() + ")");
+              conditions.append(" (- " + idx.simplify_name() + " " + low.simplify_name() + "))");
             }
           }
           if (i == 1
@@ -536,11 +533,12 @@ public class Quantify {
                 "nullness") // if variable is a sequence (is it?), then index is non-null
             @NonNull Term prev_idx = qrets[i - 1].index;
             if (flags.contains(QuantFlags.ADJACENT)) {
-              conditions.add(
-                  "(EQ (+ " + prev_idx.simplify_name() + " 1) " + idx.simplify_name() + ")");
+              conditions.append(
+                  " (EQ (+ " + prev_idx.simplify_name() + " 1) " + idx.simplify_name() + ")");
             }
             if (flags.contains(QuantFlags.DISTINCT)) {
-              conditions.add("(NEQ " + prev_idx.simplify_name() + " " + idx.simplify_name() + ")");
+              conditions.append(
+                  " (NEQ " + prev_idx.simplify_name() + " " + idx.simplify_name() + ")");
             }
           }
         }
@@ -562,7 +560,7 @@ public class Quantify {
         avi_list.add(arr_var_indexed);
         // result[i + 1] = qret.root_primes[i].simplify_name();
       }
-      arr_vars_indexed = avi_list.toArray(new String[0]);
+      arr_vars_indexed = avi_list.toArray(new String[avi_list.size()]);
 
       // stringify the indices,
       // note that the index should be relative to the slice, not relative

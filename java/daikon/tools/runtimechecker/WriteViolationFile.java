@@ -4,12 +4,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import org.checkerframework.checker.signature.qual.BinaryName;
@@ -20,11 +18,6 @@ import org.checkerframework.checker.signature.qual.BinaryName;
  * violations that occur during execution.
  */
 class WriteViolationFile {
-
-  /** Do not instantiate. */
-  private WriteViolationFile() {
-    throw new Error("Do not instantiate");
-  }
 
   public static void usage() {
     System.out.println("Usage:  java WriteViolationFile CLASS ARGS");
@@ -93,8 +86,7 @@ class WriteViolationFile {
 
       // On-the-fly implementation should flush after each violation is
       // written to disk.
-      Path violationsPath = Paths.get("violations.txt");
-      try (BufferedWriter writer = Files.newBufferedWriter(violationsPath, UTF_8)) {
+      try (BufferedWriter writer = Files.newBufferedWriter(Paths.get("violations.txt"), UTF_8)) {
         writer.write(
             "# Times an invariant was evaluated ----------- "
                 + Long.toString(Runtime.numEvaluations)
@@ -114,7 +106,7 @@ class WriteViolationFile {
                 + daikon.Global.lineSep
                 + "# Violations: ");
 
-        if (vios.isEmpty()) {
+        if (vios.size() == 0) {
           writer.write("none." + daikon.Global.lineSep);
         } else {
           writer.write(daikon.Global.lineSep);
@@ -124,7 +116,7 @@ class WriteViolationFile {
           }
         }
       } catch (IOException e) {
-        throw new UncheckedIOException("Problem while writing file " + violationsPath, e);
+        throw new Error("Problem while writing file violations.txt", e);
       }
     }
   }

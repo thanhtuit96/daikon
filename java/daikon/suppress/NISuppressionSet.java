@@ -23,7 +23,6 @@ import org.plumelib.util.StringsPlume;
 
 /**
  * Class that defines a set of non-instantiating suppressions for a single invariant (suppressee).
- * Each of the suppressors individually implies the suppressee.
  *
  * <p>Not immutable: see recurse_definitions().
  */
@@ -336,18 +335,16 @@ public class NISuppressionSet implements Iterable<NISuppression> {
       if (suppression_set[i].invalidated()) {
 
         Invariant v = suppression_set[i].suppressee.instantiate(vis, ppt);
-        if (v != null) {
-          new_invs.add(v);
-        }
+        if (v != null) new_invs.add(v);
         return;
       }
     }
   }
 
   /**
-   * Returns true if the suppression set is valid in the specified slice. The suppression set is
-   * valid if any of its suppressions are valid. A suppression is valid if all of its suppressors
-   * are true.
+   * Determines whether or not the suppression set is valid in the specified slice. The suppression
+   * set is valid if any of its suppressions are valid. A suppression is valid if all of its
+   * suppressors are true.
    *
    * <p>Also updates the debug information in each suppressor.
    *
@@ -355,11 +352,11 @@ public class NISuppressionSet implements Iterable<NISuppression> {
    */
   public boolean suppressed(PptSlice slice) {
 
-    return suppressed(slice.parent, slice.var_infos);
+    return (suppressed(slice.parent, slice.var_infos));
   }
 
   /**
-   * Returns true if the suppression set is valid in the specified ppt and var_infos. The
+   * Determines whether or not the suppression set is valid in the specified ppt and var_infos. The
    * suppression set is valid if any of its suppressions are valid. A suppression is valid if all of
    * its suppressors are true.
    *
@@ -409,20 +406,20 @@ public class NISuppressionSet implements Iterable<NISuppression> {
   }
 
   /**
-   * Returns true if the suppression set is valid in the specified slice. The suppression set is
-   * valid if any of its suppressions are valid. A suppression is valid if all of its non-missing
-   * suppressors are true.
+   * Determines whether or not the suppression set is valid in the specified slice. The suppression
+   * set is valid if any of its suppressions are valid. A suppression is valid if all of its
+   * non-missing suppressors are true.
    */
   @Pure
   public boolean is_instantiate_ok(PptSlice slice) {
 
-    return is_instantiate_ok(slice.parent, slice.var_infos);
+    return (is_instantiate_ok(slice.parent, slice.var_infos));
   }
 
   /**
-   * Returns true if the suppressee of the suppression set should be instantiated. Instantiation is
-   * ok only if each suppression is invalid. A suppression is valid if all of its non-missing
-   * suppressors are true.
+   * Determines whether or not the suppressee of the suppression set should be instantiated.
+   * Instantiation is ok only if each suppression is invalid. A suppression is valid if all of its
+   * non-missing suppressors are true.
    */
   @Pure
   public boolean is_instantiate_ok(PptTopLevel ppt, VarInfo[] var_infos) {
@@ -500,7 +497,7 @@ public class NISuppressionSet implements Iterable<NISuppression> {
     }
     // This isn't necessarily true if the suppressee is of the same
     // class but doesn't match due to variable swapping.
-    // assert !new_suppressions.isEmpty();
+    // assert new_suppressions.size() > 0;
 
     // Create a new suppression set with all of the suppressions.
     /*NNC:@MonotonicNonNull*/ NISuppression[] new_array =

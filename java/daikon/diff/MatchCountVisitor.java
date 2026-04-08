@@ -60,9 +60,8 @@ public class MatchCountVisitor extends PrintAllVisitor {
       String bucketKey = thisPptName1.substring(0, thisPptName1.lastIndexOf(";condition"));
       key1 = bucketKey + "$" + inv1.format_using(OutputFormat.JAVA);
       // checks for justification
-      if (shouldPrint(inv1, inv1)) { // [???]
-        cnt.add(key1);
-      }
+      if (shouldPrint(inv1, inv1)) // [???]
+      cnt.add(key1);
     }
 
     if (inv2 != null && inv2.justified() && !filterOut(inv2)) {
@@ -143,7 +142,7 @@ public class MatchCountVisitor extends PrintAllVisitor {
         // remember identifiers can not begin with [0-9\-]
         if (Character.isDigit(firstChar) || firstChar == '-') {
           if (acceptableNumber(oneToken)) {
-            // continue;
+            continue;
           } else {
             return true;
           }
@@ -152,23 +151,15 @@ public class MatchCountVisitor extends PrintAllVisitor {
       } catch (NumberFormatException e) {
         System.out.println(
             "Should never get here... NumberFormatException in filterOut: " + oneToken);
-        // continue;
+        continue;
       }
     }
     return false;
   }
 
-  /**
-   * Returns the recall.
-   *
-   * @return the recall
-   */
   public double calcRecall() {
     System.out.println("Recall: " + recall.size() + " / " + targSet.size());
-    if (targSet.isEmpty()) {
-      // avoids divide by zero
-      return -1;
-    }
+    if (targSet.size() == 0) return -1; // avoids divide by zero
     return (double) recall.size() / targSet.size();
   }
 
@@ -183,7 +174,7 @@ public class MatchCountVisitor extends PrintAllVisitor {
     // point number
 
     // could be float, look for "."
-    if (numLiteral.indexOf('.') > -1) {
+    if (numLiteral.indexOf(".") > -1) {
       // float fnum = Float.parseFloat(numLiteral);
       // for now, accept all floats (ignore return value of parseFloat)
       return true;
@@ -200,10 +191,7 @@ public class MatchCountVisitor extends PrintAllVisitor {
   public double calcPrecision() {
 
     System.out.println("Prec: " + recall.size() + " / " + cnt.size());
-    if (cnt.isEmpty()) {
-      // to avoid a divide by zero
-      return -1;
-    }
+    if (cnt.size() == 0) return -1; // to avoid a divide by zero -LL
     return (double) recall.size() / cnt.size();
   }
 

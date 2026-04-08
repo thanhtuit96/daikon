@@ -3,7 +3,6 @@ package daikon.split;
 import daikon.split.misc.CallerContextSplitter;
 import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -25,21 +24,13 @@ import org.plumelib.util.EntryReader;
  * the caller (i.e., which static callgraph edge was taken).
  */
 public class ContextSplitterFactory {
-
-  /** Do not instantiate. */
-  private ContextSplitterFactory() {
-    throw new Error("Do not instantiate");
-  }
-
   /** Debug tracer. */
   public static final Logger debug = Logger.getLogger("daikon.split.ContextSplitterFactory");
 
   /** Callsite granularity at the line level. */
   public static final int GRAIN_LINE = 0;
-
   /** Callsite granularity at the method level. */
   public static final int GRAIN_METHOD = 1;
-
   /** Callsite granularity at the class level. */
   public static final int GRAIN_CLASS = 2;
 
@@ -72,7 +63,7 @@ public class ContextSplitterFactory {
         MapfileEntry[] entries = parse_mapfile(file);
         splitters = make_context_splitters(entries, grain);
       } catch (IOException e) {
-        throw new UncheckedIOException("problem reading " + file, e);
+        throw new Error(e);
       }
 
       for (int j = 0; j < splitters.length; j++) {
@@ -123,8 +114,8 @@ public class ContextSplitterFactory {
   public static MapfileEntry[] parse_mapfile(File mapfile) throws IOException {
     ArrayList<MapfileEntry> result = new ArrayList<>();
 
-    try (EntryReader er = new EntryReader(mapfile.toString())) {
-      for (String reader_line : er) {
+    try {
+      for (String reader_line : new EntryReader(mapfile.toString())) {
         String line = reader_line;
         // Remove comments, skip blank lines
         {
@@ -142,15 +133,9 @@ public class ContextSplitterFactory {
         // 0x85c2e8c PC.RPStack get [PC/RPStack.java:156:29] -> "getCons" [(I)LPC/Cons;] PC.RP meth
         // where this ^ is a tab and the rest are single spaces
         long id;
-        String fromclass;
-        String frommeth;
-        String fromfile;
-        long fromline;
-        long fromcol;
-        String toexpr;
-        String toargs;
-        String toclass;
-        String tometh;
+        String fromclass, frommeth, fromfile;
+        long fromline, fromcol;
+        String toexpr, toargs, toclass, tometh;
 
         int tab = line.indexOf('\t');
         int arrow = line.indexOf(" -> ");
@@ -200,7 +185,7 @@ public class ContextSplitterFactory {
       throw (IOException) new IOException("Malformed number").initCause(e);
     }
 
-    return result.toArray(new MapfileEntry[0]);
+    return result.toArray(new MapfileEntry[result.size()]);
   }
 
   /**
@@ -287,11 +272,11 @@ public class ContextSplitterFactory {
       }
 
       // Collect all splitters for one callee_ppt_name
-      Splitter[] splitters_array = splitters.toArray(new Splitter[0]);
+      Splitter[] splitters_array = splitters.toArray(new Splitter[splitters.size()]);
       result.add(new PptNameAndSplitters(callee_ppt_name, splitters_array));
     }
 
-    return result.toArray(new PptNameAndSplitters[0]);
+    return result.toArray(new PptNameAndSplitters[result.size()]);
   }
 
   /** Simple record type to store a PptName and Splitter array. */

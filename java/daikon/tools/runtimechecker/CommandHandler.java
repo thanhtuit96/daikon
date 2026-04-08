@@ -6,7 +6,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.UncheckedIOException;
 
 /**
  * A command handler handles a set of commands. A command is the first argument given to the
@@ -26,19 +25,29 @@ public class CommandHandler {
     String[] classnameArray = getClass().getName().split("\\.");
     String simpleClassname = classnameArray[classnameArray.length - 1];
 
-    String docFile = simpleClassname + ".doc";
-    InputStream in = getClass().getResourceAsStream(docFile);
+    InputStream in = getClass().getResourceAsStream(simpleClassname + ".doc");
     if (in == null) {
       System.err.println("Didn't find documentation for " + getClass());
       return;
     }
-    try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, UTF_8))) {
+    BufferedReader reader = new BufferedReader(new InputStreamReader(in, UTF_8));
+    try {
       String line;
       while ((line = reader.readLine()) != null) {
         System.err.println(line);
       }
     } catch (IOException e) {
-      throw new UncheckedIOException("problem reading " + docFile, e);
+      try {
+        reader.close();
+      } catch (IOException e2) {
+        // ignore second exception
+      }
+      throw new Error(e);
+    }
+    try {
+      reader.close();
+    } catch (IOException e) {
+      throw new Error(e);
     }
   }
 }

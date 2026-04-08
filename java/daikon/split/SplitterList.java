@@ -6,7 +6,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.StringJoiner;
 import java.util.logging.Level;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
@@ -65,11 +64,16 @@ public abstract class SplitterList {
     if (splits == null) {
       return "null";
     }
-    StringJoiner sj = new StringJoiner(", ", "[", "]");
-    for (Splitter split : splits) {
-      sj.add("\"" + split.condition() + "\"");
+    StringBuilder sb = new StringBuilder();
+    sb.append("[");
+    for (int i = 0; i < splits.length; i++) {
+      if (i != 0) sb.append(", ");
+      sb.append("\"");
+      sb.append(splits[i].condition());
+      sb.append("\"");
     }
-    return sj.toString();
+    sb.append("]");
+    return sb.toString();
   }
 
   public static Splitter @Nullable [] get_raw(String pptname) {
@@ -135,7 +139,7 @@ public abstract class SplitterList {
   //     if (result != null)
   //       splitterArrays.addElement(result);
   //
-  //     if (splitterArrays.isEmpty()) {
+  //     if (splitterArrays.size() == 0) {
   //         Global.debugSplit.fine("SplitterList.get found no splitters for " + pptName);
   //         return null;
   //     } else {
@@ -152,11 +156,11 @@ public abstract class SplitterList {
   //     }
   //     return (Splitter[])splitters.toArray(new Splitter[0]);
   //   }
-  // //////////////////////
+  //////////////////////
 
   /**
-   * Returns the splitters associated with this program point name (or null). The resulting
-   * splitters are factories, not instantiated splitters.
+   * Return the splitters associated with this program point name (or null). The resulting splitters
+   * are factories, not instantiated splitters.
    *
    * @return an array of splitters
    */
@@ -178,7 +182,7 @@ public abstract class SplitterList {
       }
     }
 
-    if (splitterArrays.isEmpty()) {
+    if (splitterArrays.size() == 0) {
       Global.debugSplit.fine("SplitterList.get found no splitters for " + pptName);
       return null;
     } else {
@@ -195,7 +199,7 @@ public abstract class SplitterList {
   }
 
   /**
-   * Returns all the splitters in this program, The resulting splitters are factories, not
+   * Return all the splitters in this program, The resulting splitters are factories, not
    * instantiated splitters.
    *
    * @return an array of splitters

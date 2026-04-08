@@ -2,9 +2,8 @@ package daikon.split;
 
 import daikon.tools.jtb.Ast;
 import jtb.ParseException;
-import jtb.syntaxtree.Node;
-import jtb.syntaxtree.NodeToken;
-import jtb.visitor.DepthFirstVisitor;
+import jtb.syntaxtree.*;
+import jtb.visitor.*;
 import org.checkerframework.checker.nullness.qual.EnsuresNonNullIf;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.dataflow.qual.Pure;
@@ -59,12 +58,10 @@ class PrefixFixer extends DepthFirstVisitor {
     }
     n.beginColumn = -1;
     n.endColumn = -1;
-    if (twoTokensAgo != null) { // test is to quiet the Nullness Checker
-      threeTokensAgo = twoTokensAgo;
-    }
-    if (lastToken != null) { // test is to quiet the Nullness Checker
-      twoTokensAgo = lastToken;
-    }
+    if (twoTokensAgo != null) // test is to quiet the Nullness Checker
+    threeTokensAgo = twoTokensAgo;
+    if (lastToken != null) // test is to quiet the Nullness Checker
+    twoTokensAgo = lastToken;
     lastToken = n;
     super.visit(n);
   }
@@ -87,7 +84,7 @@ class PrefixFixer extends DepthFirstVisitor {
   }
 
   /**
-   * Returns true if n is at the end of a set of node tokens that form a prefixed name needing
+   * Return whether n is at the end of a set of node tokens that form a prefixed name needing
    * fixing.
    *
    * @param n a node token
