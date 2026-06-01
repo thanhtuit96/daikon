@@ -119,7 +119,7 @@ def strip_comp_number(comp_num: str) -> str:
         comp_num: a comparability, possibly in array form
 
     Returns:
-        the comparibility without the array part
+        the comparability without the array part
     """
     if "[" in comp_num:
         return comp_num[: comp_num.find("[")]
@@ -485,8 +485,6 @@ kvasir_ppt_names = [
     name for name in kvasir_ppt_names if (strip_kvasir_ppt_name(name) in dfec_ppt_map)
 ]
 
-
-#
 
 output_no_comp_decls_f.write("VarComparability\nnone\n\n")
 
