@@ -67,6 +67,8 @@ public final class MergeInvariants {
           OptionalDataException,
           IOException,
           ClassNotFoundException {
+    LogHelper.setLevel("daikon.MergeInvariants", FINE);
+    LogHelper.setLevel("daikon.MergeInvariants.progress", FINE);
     try {
       mainHelper(args);
     } catch (Daikon.DaikonTerminationException e) {
@@ -239,13 +241,23 @@ public final class MergeInvariants {
         } else {
           PptMap pmap = FileIO.read_serialized_pptmap(file, true);
           for (PptTopLevel ppt : pmap.pptIterable()) {
+            boolean debug =
+                ppt.name()
+                    .startsWith(
+                        "com.rolemodelsoft.drawlet.basics.AbstractFigure.addPropertyChangeListener(java.beans.PropertyChangeListener)");
+
             if (merge_ppts.containsName(ppt.name())) {
               // System.out.printf("Not adding ppt %s from %s%n", ppt, file);
+              if (debug) {
+                System.out.printf("Not adding ppt %s from %s%n", ppt, file);
+              }
               continue;
             }
             merge_ppts.add(ppt);
             // System.out.printf("Adding ppt %s from %s%n", ppt, file);
-
+            if (debug) {
+              System.out.printf("Adding ppt %s from %s%n", ppt, file);
+            }
             // Make sure that the parents of this ppt are already in
             // the map.  This will be true if all possible children of
             // any ppt are always included in the same invariant file.
@@ -286,7 +298,13 @@ public final class MergeInvariants {
     // upper points.
     debugProgress.fine("Building hierarchy between leaves of the maps");
     for (PptTopLevel ppt : merge_ppts.pptIterable()) {
-
+      boolean debug =
+          ppt.name()
+              .startsWith(
+                  "com.rolemodelsoft.drawlet.basics.AbstractFigure.addPropertyChangeListener(java.beans.PropertyChangeListener)");
+      if (debug) {
+        System.out.printf("MergeInvariants processing ppt " + ppt);
+      }
       // Skip everything that is not a final exit point
       if (!ppt.ppt_name.isExitPoint()) {
         assert !ppt.children.isEmpty() : ppt;
@@ -299,7 +317,9 @@ public final class MergeInvariants {
 
       // System.out.printf("Including ppt %s, %d children%n", ppt,
       //                   ppt.children.size());
-
+      if (debug) {
+        System.out.printf("Including ppt %s, %d children%n", ppt, ppt.children.size());
+      }
       // Splitters should not have any children to begin with
       if (ppt.has_splitters()) {
         assert ppt.splitters != null; // because ppt.has_splitters() = true
