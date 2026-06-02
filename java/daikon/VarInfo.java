@@ -2,6 +2,7 @@ package daikon;
 
 import static daikon.FileIO.VarDefinition;
 
+import daikon.FileIO.VarDefinition;
 import daikon.Quantify.QuantFlags;
 import daikon.Quantify.QuantifyReturn;
 import daikon.VarInfoName.Add;
@@ -3146,6 +3147,13 @@ public final @Interned class VarInfo implements Cloneable, Serializable {
     }
     if (format == OutputFormat.CSHARPCONTRACT) {
       return csharp_name();
+    }
+    
+    if (format == OutputFormat.POSTMAN) {
+      return name();
+    }
+    if (format == OutputFormat.DSL) {
+      return name();
     }
     throw new UnsupportedOperationException("Unknown format requested: " + format);
   }

@@ -30,7 +30,11 @@ public enum OutputFormat {
   /** Simplify theorem prover. First order logical expressions, expressed in Lisp-style parens. */
   SIMPLIFY("Simplify"),
   /** C# Code Contract. */
-  CSHARPCONTRACT("CSharpContract");
+  CSHARPCONTRACT("CSharpContract"),
+  /** DSL **/
+  DSL("DSL"),
+  /** Postman test cases assertions format. */
+  POSTMAN("Postman");
 
   final String name;
 
@@ -53,7 +57,7 @@ public enum OutputFormat {
   // can be case-sensitive, can permit alternative names, etc.  An enum
   // cannot override valueOf().
   /**
-   * Returns the appropriate OutputFormat for the given name, or throw an error if no such
+   * Return the appropriate OutputFormat for the given name, or throw an error if no such
    * OutputFormat exists.
    */
   public static OutputFormat get(String name) {
@@ -82,6 +86,13 @@ public enum OutputFormat {
     if (name.compareToIgnoreCase(CSHARPCONTRACT.name) == 0) {
       return CSHARPCONTRACT;
     }
+    if (name.compareToIgnoreCase(POSTMAN.name) == 0) {
+      return POSTMAN;
+    }
+    if (name.compareToIgnoreCase(DSL.name) == 0) {
+      return DSL;
+    }
+
     // return null;
     throw new Error("Unknown OutputFormat " + name);
   }

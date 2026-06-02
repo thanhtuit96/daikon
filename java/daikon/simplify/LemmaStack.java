@@ -430,7 +430,6 @@ import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
       }
       Lemma bad = problems.get(problems.size() - 1);
       removeLemma(bad);
-      System.err.print("x");
     } while (checkForContradiction() == 'T');
   }
 
@@ -545,6 +544,21 @@ import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
   @EnsuresCalledMethods(value = "session", methods = "close")
   @Override
   public void close(@GuardSatisfied LemmaStack this) {
+    // this.session should be effectively final in that it refers
+    // to the same value throughout the execution of this method.
+    // Unfortunately, the Lock Checker cannot verify this,
+    // so a final local variable is used to satisfy the Lock Checker's
+    // requirement that all variables used as locks be final or
+    // effectively final.  If a bug exists whereby this.session
+    // is not effectively final, this would unfortunately mask that error.
+    final SessionManager session = this.session;
+    session.close();
+    synchronized (session) {
+      session.notifyAll();
+    }
+  }
+  
+  public void closeSession() {
     // this.session should be effectively final in that it refers
     // to the same value throughout the execution of this method.
     // Unfortunately, the Lock Checker cannot verify this,
