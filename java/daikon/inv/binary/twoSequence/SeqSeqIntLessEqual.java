@@ -14,6 +14,7 @@ import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
+import org.checkerframework.framework.qual.Unused;
 import org.plumelib.util.ArraysPlume;
 import org.plumelib.util.Intern;
 import typequals.prototype.qual.NonPrototype;
@@ -43,6 +44,14 @@ public class SeqSeqIntLessEqual extends TwoSequence
 
   /** Debugging logger. */
   static final Logger debug = Logger.getLogger("daikon.inv.binary.twoSequence.SeqSeqIntLessEqual");
+  // If AGORA++ is applied, do not report the invariant if the maximum value of the elements of v1 is less than
+  // the minimum value of the elements of v2
+  @Unused(when=Prototype.class)
+  private Long v1ElementsMaxValue = Long.MIN_VALUE;
+
+  @Unused(when=Prototype.class)
+  private Long v2ElementsMinValue = Long.MAX_VALUE;
+
 
   static Comparator<long[]> comparator = ArraysPlume.LongArrayComparatorLexical.it;
 
@@ -216,7 +225,18 @@ public class SeqSeqIntLessEqual extends TwoSequence
     // if ((v1.length == 0) || (v2.length == 0)) {
     //   return;
     // }
+        
+    // Update maximum value of v1 elements
+    Long currentV1MaxValue = Arrays.stream(v1).max().orElse(Long.MIN_VALUE);
+    if(currentV1MaxValue > v1ElementsMaxValue) {
+      v1ElementsMaxValue = currentV1MaxValue;
+    }
 
+    // Update minimum value of v2 elements
+    Long currentV2MinValue = Arrays.stream(v2).min().orElse(Long.MAX_VALUE);
+    if(currentV2MinValue < v2ElementsMinValue) {
+      v2ElementsMinValue = currentV2MinValue;
+    }
     int comparison = 0;
     if (orderMatters) {
       // Standard element wise comparison
@@ -242,7 +262,13 @@ public class SeqSeqIntLessEqual extends TwoSequence
 
   @Override
   protected double computeConfidence() {
-
+     // If AGORA++ is applied, do not report the invariant if the maximum value of the elements of v1 is less than
+    // the minimum value of the elements of v2
+    if(use_agora_pp) {
+      if (v1ElementsMaxValue < v2ElementsMinValue) {
+        return Invariant.CONFIDENCE_UNJUSTIFIED;
+      }
+    }
     return 1 - Math.pow(.5, ppt.num_values());
   }
 
@@ -491,10 +517,35 @@ public class SeqSeqIntLessEqual extends TwoSequence
             new NISuppression(v1_pw_v2, suppressee),
           });
 
+  // @Override
+  // public @Nullable @NonPrototype SeqSeqIntLessEqual merge(
+  //     @Prototype SeqSeqIntLessEqual this, List<@NonPrototype Invariant> invs, PptSlice parent_ppt) {
+  //   // Ignore the orderMatters field, because it is always the same (and is always true).
+  //   return (SeqSeqIntLessEqual) super.merge(invs, parent_ppt);
+  // }
   @Override
   public @Nullable @NonPrototype SeqSeqIntLessEqual merge(
-      @Prototype SeqSeqIntLessEqual this, List<@NonPrototype Invariant> invs, PptSlice parent_ppt) {
-    // Ignore the orderMatters field, because it is always the same (and is always true).
-    return (SeqSeqIntLessEqual) super.merge(invs, parent_ppt);
+      @Prototype SeqSeqIntLessEqual this,
+      List<@NonPrototype Invariant> invs,
+      PptSlice parent_ppt) {
+
+    SeqSeqIntLessEqual result =
+        (SeqSeqIntLessEqual) super.merge(invs, parent_ppt);
+
+    if (result == null) {
+      return null;
+    }
+
+    for (Invariant inv : invs) {
+      SeqSeqIntLessEqual s = (SeqSeqIntLessEqual) inv;
+
+      result.v1ElementsMaxValue =
+          Math.max(result.v1ElementsMaxValue, s.v1ElementsMaxValue);
+
+      result.v2ElementsMinValue =
+          Math.min(result.v2ElementsMinValue, s.v2ElementsMinValue);
+    }
+
+    return result;
   }
 }

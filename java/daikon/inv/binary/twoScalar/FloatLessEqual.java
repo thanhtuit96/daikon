@@ -19,12 +19,15 @@ import org.checkerframework.checker.interning.qual.Interned;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
+import org.checkerframework.framework.qual.Unused;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
 import org.plumelib.util.Intern;
 import typequals.prototype.qual.NonPrototype;
 import typequals.prototype.qual.Prototype;
 
+import static daikon.Daikon.use_agora_pp;
+import static daikon.agora.PostmanUtils.getPostmanVariableName;
 /**
  * Represents an invariant of &le; between two double scalars. Prints as {@code x <= y}.
  */
@@ -38,6 +41,13 @@ public final class FloatLessEqual extends TwoFloat {
   public static boolean dkconfig_enabled = Invariant.invariantEnabledDefault;
 
   public static final Logger debug = Logger.getLogger("daikon.inv.binary.twoScalar.FloatLessEqual");
+  
+  // If AGORA++ is applied, do not report the invariant if the maximum value of v1 is less than the minimum value of v2
+  @Unused(when=Prototype.class)
+  private Double v1MaxValue = Double.MIN_VALUE;
+
+  @Unused(when=Prototype.class)
+  private Double v2MinValue = Double.MAX_VALUE;
 
   FloatLessEqual(PptSlice ppt) {
     super(ppt);
@@ -154,12 +164,27 @@ public final class FloatLessEqual extends TwoFloat {
           + var2().simplifyFixup(var2name)
           + ")";
     }
-
+    
+    if (format == OutputFormat.POSTMAN) {
+      return "pm.expect(" + getPostmanVariableName(var1().name()) + ").to.be.lte(" + getPostmanVariableName(var2().name()) + ")";
+    }
+    if (format == OutputFormat.DSL) {
+      return "lte(" + var1name + ", " + var2name + ")";
+    }
     return format_unimplemented(format);
   }
 
   @Override
   public InvariantStatus check_modified(double v1, double v2, int count) {
+    // Update maximum value of v1
+    if(v1 > v1MaxValue) {
+      v1MaxValue = v1;
+    }
+
+    // Update minimumn value of v2
+    if(v2 < v2MinValue) {
+      v2MinValue = v2;
+    }
     if (!Global.fuzzy.lte(v1, v2)) {
       return InvariantStatus.FALSIFIED;
     }
@@ -194,7 +219,14 @@ public final class FloatLessEqual extends TwoFloat {
       // // possible (pegA, pegB) pairs.
       // return 1 - (Math.pow(.5, ppt.num_values())
       //             * Math.pow(.99, ppt.num_mod_samples()));
-      return 1 - Math.pow(.5, ppt.num_samples());
+    
+    // If AGORA++ is applied, do not report the invariant if the maximum value of v1 is less than the minimum value of v2
+    if (use_agora_pp) {
+      if (v1MaxValue < v2MinValue) {
+        return Invariant.CONFIDENCE_UNJUSTIFIED;
+      }
+    }
+    return 1 - Math.pow(.5, ppt.num_samples());
   }
 
   @Pure
@@ -396,5 +428,29 @@ public final class FloatLessEqual extends TwoFloat {
     }
     return suppressions;
   }
+  @Override
+  public Invariant merge(List<Invariant> invs, PptSlice parent_ppt) {
 
+    FloatLessEqual result = (FloatLessEqual) super.merge(invs, parent_ppt);
+    if (result == null) {
+      return null;
+    }
+
+    result.v1MaxValue = Double.MIN_VALUE;
+    result.v2MinValue = Double.MAX_VALUE;
+
+    for (Invariant inv : invs) {
+      FloatLessEqual other = (FloatLessEqual) inv;
+
+      if (other.v1MaxValue > result.v1MaxValue) {
+        result.v1MaxValue = other.v1MaxValue;
+      }
+
+      if (other.v2MinValue < result.v2MinValue) {
+        result.v2MinValue = other.v2MinValue;
+      }
+    }
+
+    return result;
+  }
 }

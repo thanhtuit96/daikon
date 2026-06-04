@@ -10,6 +10,7 @@ import daikon.inv.binary.twoScalar.*;
 import daikon.suppress.*;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.checkerframework.checker.interning.qual.Interned;
@@ -18,6 +19,7 @@ import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
+import org.checkerframework.framework.qual.Unused;
 import org.plumelib.util.ArraysPlume;
 import org.plumelib.util.Intern;
 import typequals.prototype.qual.NonPrototype;
@@ -38,6 +40,14 @@ public class PairwiseIntGreaterThan extends TwoSequence {
   /** Debug tracer. */
   public static final Logger debug =
     Logger.getLogger("daikon.inv.binary.twoSequence.PairwiseIntGreaterThan");
+  
+  // If AGORA++ is applied, do not report the invariant if the minimum value of the elements of a1 is greater than
+  // the maximum value of the elements of a2
+  @Unused(when=Prototype.class)
+  private Long a1ElementsMinValue = Long.MAX_VALUE;
+
+  @Unused(when=Prototype.class)
+  private Long a2ElementsMaxValue = Long.MIN_VALUE;
 
   // Variables starting with dkconfig_ should only be set via the
   // daikon.config.Configuration interface.
@@ -287,6 +297,16 @@ public class PairwiseIntGreaterThan extends TwoSequence {
     for (int i = 0; i < len; i++) {
       long v1 = a1[i];
       long v2 = a2[i];
+      // Update minimum value of a1 elements
+      if(v1 < a1ElementsMinValue) {
+        a1ElementsMinValue = v1;
+      }
+
+      // Update maximum value of a2 elements
+      if(v2 > a2ElementsMaxValue) {
+        a2ElementsMaxValue = v2;
+      }
+
       if (!(v1 > v2) ) {
         //  destroyAndFlow();
         return InvariantStatus.FALSIFIED;
@@ -313,7 +333,14 @@ public class PairwiseIntGreaterThan extends TwoSequence {
     if (num_values == 0) {
       return Invariant.CONFIDENCE_UNJUSTIFIED;
     } else {
-
+      
+      // If AGORA++ is applied, do not report the invariant if the minimum value of the elements of a1 is greater than
+      // the maximum value of the elements of a2
+      if(use_agora_pp) {
+        if(a1ElementsMinValue > a2ElementsMaxValue) {
+          return Invariant.CONFIDENCE_UNJUSTIFIED;
+        }
+      }
       return 1 - Math.pow(.5, num_values);
     }
   }
@@ -348,6 +375,30 @@ public class PairwiseIntGreaterThan extends TwoSequence {
     return suppressions;
   }
 
-    private static @Nullable NISuppressionSet suppressions = null;
+  private static @Nullable NISuppressionSet suppressions = null;
+  @Override
+  public Invariant merge(List<Invariant> invs, PptSlice parent_ppt) {
 
-}
+    PairwiseIntGreaterThan result =
+        (PairwiseIntGreaterThan) super.merge(invs, parent_ppt);
+
+    if (result == null) {
+      return null;
+    }
+
+    result.a1ElementsMinValue = Long.MAX_VALUE;
+    result.a2ElementsMaxValue = Long.MIN_VALUE;
+
+    for (Invariant inv : invs) {
+      PairwiseIntGreaterThan pigt = (PairwiseIntGreaterThan) inv;
+
+      result.a1ElementsMinValue =
+          Math.min(result.a1ElementsMinValue, pigt.a1ElementsMinValue);
+
+      result.a2ElementsMaxValue =
+          Math.max(result.a2ElementsMaxValue, pigt.a2ElementsMaxValue);
+    }
+
+    return result;
+  }
+  }

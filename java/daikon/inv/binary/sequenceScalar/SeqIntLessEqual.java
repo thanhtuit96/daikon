@@ -15,10 +15,13 @@ import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
+import org.checkerframework.framework.qual.Unused;
+import org.checkerframework.checker.nullness.qual.NonNull;
 import org.plumelib.util.Intern;
 import typequals.prototype.qual.NonPrototype;
 import typequals.prototype.qual.Prototype;
 import static daikon.agora.PostmanUtils.getPostmanVariableName;
+import static daikon.Daikon.use_agora_pp;
 
 /**
  * Represents an invariant between a long scalar and a a sequence of long values. Prints
@@ -35,6 +38,13 @@ public final class SeqIntLessEqual extends SequenceScalar {
 
   public static final Logger debug =
     Logger.getLogger("daikon.inv.binary.sequenceScalar.SeqIntLessEqual");
+  // If AGORA++ is applied, do not report the invariant if the maximum value of the elements of a
+  // is less than the minimum value of x
+  @Unused(when=Prototype.class)
+  private Long aElementsMaxValue = Long.MIN_VALUE;
+
+  @Unused(when= Prototype.class)
+  private Long xMinValue = Long.MAX_VALUE;
 
   static boolean debugSeqIntComparison = false;
 
@@ -208,7 +218,17 @@ public final class SeqIntLessEqual extends SequenceScalar {
     /*if (logDetail() || debug.isLoggable(Level.FINE))
       log(debug,"(<= " + Arrays.toString(a)
       + " " + x);*/
+    // Update the minimum value of x
+    if(x < xMinValue) {
+      xMinValue = x;
+    }
+
     for (int i = 0; i < a.length; i++) {
+
+      // Update the maximum value of the elements of a
+      if(a[i] > aElementsMaxValue) {
+        aElementsMaxValue = a[i];
+      }
 
         // assert seqvar().type.elementIsIntegral();
 
@@ -237,9 +257,15 @@ public final class SeqIntLessEqual extends SequenceScalar {
     if (vs.elem_cnt() == 0) {
       return CONFIDENCE_UNJUSTIFIED;
     }
-
+    // If AGORA++ is applied, do not report the invariant if the maximum value of the elements of a
+    // is less than the minimum value of x
+    if(use_agora_pp) {
+      if(aElementsMaxValue < xMinValue) {
+        return Invariant.CONFIDENCE_UNJUSTIFIED;
+      }
+    }
       // return 1 - Math.pow(.5, vs.elem_cnt());
-      return 1 - Math.pow(.5, ppt.num_samples());
+    return 1 - Math.pow(.5, ppt.num_samples());
   }
 
   @Pure
@@ -376,5 +402,29 @@ public final class SeqIntLessEqual extends SequenceScalar {
             // v1 < v2 => v1 <= v2
             new NISuppression(v1_lt_v2, suppressee),
         });
+        @Override
+  public @Nullable Invariant merge(
+      List<@NonNull Invariant> invs, PptSlice parent_ppt) {
 
+    SeqIntLessEqual result =
+        (SeqIntLessEqual) super.merge(invs, parent_ppt);
+    if (result == null) {
+      return null;
+    }
+
+    result.aElementsMaxValue = Long.MIN_VALUE;
+    result.xMinValue = Long.MAX_VALUE;
+
+    for (Invariant inv : invs) {
+      SeqIntLessEqual other = (SeqIntLessEqual) inv;
+
+      result.aElementsMaxValue =
+          Math.max(result.aElementsMaxValue, other.aElementsMaxValue);
+
+      result.xMinValue =
+          Math.min(result.xMinValue, other.xMinValue);
+    }
+
+    return result;
+  }
 }

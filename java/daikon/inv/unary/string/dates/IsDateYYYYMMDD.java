@@ -67,7 +67,7 @@ public class IsDateYYYYMMDD extends SingleString {
     @Override
     public String format_using(@GuardSatisfied IsDateYYYYMMDD this, OutputFormat format) {
         if (format == OutputFormat.DAIKON) {
-            return var().name() + " is a Date. Format: YYYY/MM/DD";
+            return var().name() + " is a Date. Format: YYYY/MM/DD or YYYY-MM-DD or YYYY.MM.DD";
         }
 
         if (format == OutputFormat.POSTMAN) {

@@ -19,6 +19,7 @@ import org.checkerframework.checker.interning.qual.Interned;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
+import org.checkerframework.framework.qual.Unused;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
 import org.plumelib.util.Intern;
@@ -41,6 +42,13 @@ public final class IntLessThan extends TwoScalar {
   public static boolean dkconfig_enabled = Invariant.invariantEnabledDefault;
 
   public static final Logger debug = Logger.getLogger("daikon.inv.binary.twoScalar.IntLessThan");
+  
+  // If AGORA++ is applied, do not report the invariant if the maximum value of v1 is less than the minimum value of v2
+  @Unused(when=Prototype.class)
+  private Long v1MaxValue = Long.MIN_VALUE;
+
+  @Unused(when=Prototype.class)
+  private Long v2MinValue = Long.MAX_VALUE;
 
   IntLessThan(PptSlice ppt) {
     super(ppt);
@@ -176,6 +184,16 @@ public final class IntLessThan extends TwoScalar {
 
   @Override
   public InvariantStatus check_modified(long v1, long v2, int count) {
+    // Update maximum value of v1
+    if(v1 > v1MaxValue) {
+      v1MaxValue = v1;
+    }
+
+    // Update minimumn value of v2
+    if (v2 < v2MinValue) {
+      v2MinValue = v2;
+    }
+    
     if (!(v1 < v2)) {
       return InvariantStatus.FALSIFIED;
     }
@@ -210,7 +228,13 @@ public final class IntLessThan extends TwoScalar {
       // // possible (pegA, pegB) pairs.
       // return 1 - (Math.pow(.5, ppt.num_values())
       //             * Math.pow(.99, ppt.num_mod_samples()));
-      return 1 - Math.pow(.5, ppt.num_samples());
+    // If AGORA++ is applied, do not report the invariant if the maximum value of v1 is less than the minimum value of v2
+    if(use_agora_pp) {
+      if(v1MaxValue < v2MinValue) {
+        return Invariant.CONFIDENCE_UNJUSTIFIED;
+      }
+    }
+    return 1 - Math.pow(.5, ppt.num_samples());
   }
 
   @Pure
@@ -450,5 +474,29 @@ public final class IntLessThan extends TwoScalar {
   public @Nullable NISuppressionSet get_ni_suppressions() {
     return null;
   }
+  @Override
+  public Invariant merge(List<Invariant> invs, PptSlice parent_ppt) {
 
+    IntLessThan result = (IntLessThan) super.merge(invs, parent_ppt);
+    if (result == null) {
+      return null;
+    }
+
+    result.v1MaxValue = Long.MIN_VALUE;
+    result.v2MinValue = Long.MAX_VALUE;
+
+    for (Invariant inv : invs) {
+      IntLessThan other = (IntLessThan) inv;
+
+      if (other.v1MaxValue > result.v1MaxValue) {
+        result.v1MaxValue = other.v1MaxValue;
+      }
+
+      if (other.v2MinValue < result.v2MinValue) {
+        result.v2MinValue = other.v2MinValue;
+      }
+    }
+
+    return result;
+  }
 }

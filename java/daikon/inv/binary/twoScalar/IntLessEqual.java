@@ -19,11 +19,15 @@ import org.checkerframework.checker.interning.qual.Interned;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
+import org.checkerframework.framework.qual.Unused;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
 import org.plumelib.util.Intern;
 import typequals.prototype.qual.NonPrototype;
 import typequals.prototype.qual.Prototype;
+
+import static daikon.Daikon.use_agora_pp;
+import static daikon.agora.PostmanUtils.getPostmanVariableName;
 
 /**
  * Represents an invariant of &le; between two long scalars. Prints as {@code x <= y}.
@@ -38,6 +42,13 @@ public final class IntLessEqual extends TwoScalar {
   public static boolean dkconfig_enabled = Invariant.invariantEnabledDefault;
 
   public static final Logger debug = Logger.getLogger("daikon.inv.binary.twoScalar.IntLessEqual");
+  
+  // If AGORA++ is applied, do not report the invariant if the maximum value of v1 is less than the minimum value of v2
+  @Unused(when=Prototype.class)
+  private Long v1MaxValue = Long.MIN_VALUE;
+
+  @Unused(when=Prototype.class)
+  private Long v2MinValue = Long.MAX_VALUE;
 
   IntLessEqual(PptSlice ppt) {
     super(ppt);
@@ -160,12 +171,28 @@ public final class IntLessEqual extends TwoScalar {
           + var2().simplifyFixup(var2name)
           + ")";
     }
+    
+    if (format == OutputFormat.POSTMAN) {
+      return "pm.expect(" + getPostmanVariableName(var1().name()) + ").to.be.lte(" + getPostmanVariableName(var2().name()) + ")";
+    }
 
+    if (format == OutputFormat.DSL) {
+      return "lte(" + var1name + ", " + var2name + ")";
+    }
     return format_unimplemented(format);
   }
 
   @Override
   public InvariantStatus check_modified(long v1, long v2, int count) {
+    // Update maximum value of v1
+    if(v1 > v1MaxValue) {
+      v1MaxValue = v1;
+    }
+
+    // Update minimumn value of v2
+    if(v2 < v2MinValue) {
+      v2MinValue = v2;
+    }
     if (!(v1 <= v2)) {
       return InvariantStatus.FALSIFIED;
     }
@@ -200,7 +227,13 @@ public final class IntLessEqual extends TwoScalar {
       // // possible (pegA, pegB) pairs.
       // return 1 - (Math.pow(.5, ppt.num_values())
       //             * Math.pow(.99, ppt.num_mod_samples()));
-      return 1 - Math.pow(.5, ppt.num_samples());
+      // If AGORA++ is applied, do not report the invariant if the maximum value of v1 is less than the minimum value of v2
+    if(use_agora_pp) {
+      if(v1MaxValue < v2MinValue) {
+        return Invariant.CONFIDENCE_UNJUSTIFIED;
+      }
+    }
+    return 1 - Math.pow(.5, ppt.num_samples());
   }
 
   @Pure
@@ -402,5 +435,43 @@ public final class IntLessEqual extends TwoScalar {
     }
     return suppressions;
   }
+  
+  /**
+   * Merge the invariants in invs to form a new invariant. Each must be a IntLessEqual invariant. The
+   * work is done by the IntLessEqual core
+   *
+   * @param invs list of invariants to merge. They should all be permuted to match the variable
+   *     order in parent_ppt.
+   * @param parent_ppt slice that will contain the new invariant
+   */
+  @Override
+  public @Nullable IntLessEqual merge(
+      List<Invariant> invs,
+      PptSlice parent_ppt) {
 
+    if (invs.isEmpty()) {
+      return null;
+    }
+
+    IntLessEqual result = new IntLessEqual(parent_ppt);
+
+    long mergedV1Max = Long.MIN_VALUE;
+    long mergedV2Min = Long.MAX_VALUE;
+
+    for (Invariant inv : invs) {
+      if (!(inv instanceof IntLessEqual)) {
+        return null;
+      }
+
+      IntLessEqual ile = (IntLessEqual) inv;
+
+      mergedV1Max = Math.max(mergedV1Max, ile.v1MaxValue);
+      mergedV2Min = Math.min(mergedV2Min, ile.v2MinValue);
+    }
+
+    result.v1MaxValue = mergedV1Max;
+    result.v2MinValue = mergedV2Min;
+
+    return result;
+  }
 }

@@ -10,12 +10,14 @@ import daikon.inv.binary.twoScalar.*;
 import daikon.suppress.*;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.checkerframework.checker.interning.qual.Interned;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
+import org.checkerframework.framework.qual.Unused;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
 import org.plumelib.util.ArraysPlume;
@@ -23,6 +25,8 @@ import org.plumelib.util.Intern;
 import typequals.prototype.qual.NonPrototype;
 import typequals.prototype.qual.Prototype;
 
+import static daikon.Daikon.use_agora_pp;
+import static daikon.agora.PostmanUtils.getPostmanVariableName;
 /**
  * Represents an invariant between corresponding elements of two sequences of double values. The
  * length of the sequences must match for the invariant to hold. A comparison is made over each
@@ -35,6 +39,14 @@ public class PairwiseFloatGreaterThan extends TwoSequenceFloat {
   /** Debug tracer. */
   public static final Logger debug =
     Logger.getLogger("daikon.inv.binary.twoSequence.PairwiseFloatGreaterThan");
+  
+  // If AGORA++ is applied, do not report the invariant if the minimum value of the elements of a1 is greater than
+  // the maximum value of the elements of a2
+  @Unused(when=Prototype.class)
+  private Double a1ElementsMinValue = Double.MAX_VALUE;
+
+  @Unused(when=Prototype.class)
+  private Double a2ElementsMaxValue = Double.MIN_VALUE;
 
   // Variables starting with dkconfig_ should only be set via the
   // daikon.config.Configuration interface.
@@ -219,10 +231,24 @@ public class PairwiseFloatGreaterThan extends TwoSequenceFloat {
     if (format == OutputFormat.CSHARPCONTRACT) {
       return format_csharp();
     }
-
+    
+    if (format == OutputFormat.POSTMAN) {
+      return format_postman();
+    }
+    if (format == OutputFormat.DSL) {
+      return format_dsl();
+    }
     return format_unimplemented(format);
   }
+  
+  public String format_postman(@GuardSatisfied PairwiseFloatGreaterThan this) {
+    return "pm.expect(" + getPostmanVariableName(var1().name()) + ".every((element, index) => element > " + getPostmanVariableName(var2().name()) + "[index])).to.be.true";
+  }
 
+  public String format_dsl(@GuardSatisfied PairwiseFloatGreaterThan this) {
+    return "pairwiseGT(" + var1().name() + ", " + var2().name() + ")";
+  }
+  
   public String format_daikon(@GuardSatisfied PairwiseFloatGreaterThan this) {
     return var1().name() + " > " + var2().name() + " (elementwise)";
   }
@@ -271,6 +297,16 @@ public class PairwiseFloatGreaterThan extends TwoSequenceFloat {
     for (int i = 0; i < len; i++) {
       double v1 = a1[i];
       double v2 = a2[i];
+      
+      // Update minimum value of a1 elements
+      if(v1 < a1ElementsMinValue) {
+        a1ElementsMinValue = v1;
+      }
+
+      // Update maximum value of a2 elements
+      if (v2 > a2ElementsMaxValue) {
+        a2ElementsMaxValue = v2;
+      }
       if (!Global.fuzzy.gt(v1, v2) ) {
         //  destroyAndFlow();
         return InvariantStatus.FALSIFIED;
@@ -297,7 +333,13 @@ public class PairwiseFloatGreaterThan extends TwoSequenceFloat {
     if (num_values == 0) {
       return Invariant.CONFIDENCE_UNJUSTIFIED;
     } else {
-
+      // If AGORA++ is applied, do not report the invariant if the minimum value of the elements of a1 is greater than
+      // the maximum value of the elements of a2
+      if(use_agora_pp) {
+        if(a1ElementsMinValue > a2ElementsMaxValue) {
+          return Invariant.CONFIDENCE_UNJUSTIFIED;
+        }
+      }
       return 1 - Math.pow(.5, num_values);
     }
   }
@@ -332,6 +374,30 @@ public class PairwiseFloatGreaterThan extends TwoSequenceFloat {
     return suppressions;
   }
 
-    private static @Nullable NISuppressionSet suppressions = null;
+  private static @Nullable NISuppressionSet suppressions = null;
+  @Override
+  public Invariant merge(List<Invariant> invs, PptSlice parent_ppt) {
 
-}
+    PairwiseFloatGreaterThan result =
+        (PairwiseFloatGreaterThan) super.merge(invs, parent_ppt);
+
+    if (result == null) {
+      return null;
+    }
+
+    result.a1ElementsMinValue = Double.MAX_VALUE;
+    result.a2ElementsMaxValue = Double.MIN_VALUE;
+
+    for (Invariant inv : invs) {
+      PairwiseFloatGreaterThan pfgt = (PairwiseFloatGreaterThan) inv;
+
+      result.a1ElementsMinValue =
+          Math.min(result.a1ElementsMinValue, pfgt.a1ElementsMinValue);
+
+      result.a2ElementsMaxValue =
+          Math.max(result.a2ElementsMaxValue, pfgt.a2ElementsMaxValue);
+    }
+
+    return result;
+  }
+  }

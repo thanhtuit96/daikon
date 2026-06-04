@@ -5,6 +5,7 @@ package daikon.inv.binary.sequenceScalar;
 import daikon.*;
 import daikon.derive.unary.*;
 import daikon.inv.*;
+import daikon.inv.binary.twoScalar.IntLessEqual;
 import daikon.inv.binary.twoSequence.*;
 import daikon.inv.unary.sequence.*;
 import daikon.suppress.*;
@@ -13,12 +14,16 @@ import java.util.logging.Logger;
 import org.checkerframework.checker.interning.qual.Interned;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.Nullable;
+import org.checkerframework.framework.qual.Unused;
+import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
 import org.plumelib.util.Intern;
 import typequals.prototype.qual.NonPrototype;
 import typequals.prototype.qual.Prototype;
 
+import static daikon.Daikon.use_agora_pp;
+import static daikon.agora.PostmanUtils.getPostmanVariableName;
 /**
  * Represents an invariant between a double scalar and a a sequence of double values. Prints
  * as {@code x[] elements >= y} where {@code x} is a double sequence and
@@ -34,6 +39,13 @@ public final class SeqFloatGreaterEqual extends SequenceFloat {
 
   public static final Logger debug =
     Logger.getLogger("daikon.inv.binary.sequenceScalar.SeqFloatGreaterEqual");
+// If AGORA++ is applied, do not report the invariant if the minimum value of the elements of a
+  // is greater than the maximum value of x
+  @Unused(when= Prototype.class)
+  private Double aElementsMinValue = Double.MAX_VALUE;
+
+  @Unused(when= Prototype.class)
+  private Double xMaxValue = Double.MIN_VALUE;
 
   static boolean debugSeqIntComparison = false;
 
@@ -149,8 +161,22 @@ public final class SeqFloatGreaterEqual extends SequenceFloat {
     if (format == OutputFormat.CSHARPCONTRACT) {
       return format_csharp_contract();
     }
-
+    
+    if (format == OutputFormat.POSTMAN) {
+      return format_postman();
+    }
+    if (format == OutputFormat.DSL) {
+      return format_dsl();
+    }
     return format_unimplemented(format);
+  }
+  
+  public String format_dsl(@GuardSatisfied SeqFloatGreaterEqual this) {
+    return seqvar().name() + "->forAll(e | e >= " + sclvar().name() + ")";
+  }
+  
+  public String format_postman(@GuardSatisfied SeqFloatGreaterEqual this) {
+    return "pm.expect(" + getPostmanVariableName(seqvar().name()) + ".every(element => element >= " + getPostmanVariableName(sclvar().name()) + ")).to.be.true";
   }
 
   public String format_daikon(@GuardSatisfied SeqFloatGreaterEqual this) {
@@ -191,10 +217,16 @@ public final class SeqFloatGreaterEqual extends SequenceFloat {
     /*if (logDetail() || debug.isLoggable(Level.FINE))
       log(debug,"(>= " + Arrays.toString(a)
       + " " + x);*/
+    if(x > xMaxValue) {
+      xMaxValue = x;
+    }
+
     for (int i = 0; i < a.length; i++) {
 
         // assert seqvar().type.elementIsIntegral();
-
+      if(a[i] < aElementsMinValue) {
+        aElementsMinValue = a[i];
+      }
       if (!Global.fuzzy.gte(a[i], x)) {
         return InvariantStatus.FALSIFIED;
       }
@@ -220,9 +252,15 @@ public final class SeqFloatGreaterEqual extends SequenceFloat {
     if (vs.elem_cnt() == 0) {
       return CONFIDENCE_UNJUSTIFIED;
     }
-
+    // If AGORA++ is applied, do not report the invariant if the minimum value of the elements of a
+    // is greater than the maximum value of x
+    if(use_agora_pp) {
+      if (aElementsMinValue > xMaxValue) {
+        return Invariant.CONFIDENCE_UNJUSTIFIED;
+      }
+    }
       // return 1 - Math.pow(.5, vs.elem_cnt());
-      return 1 - Math.pow(.5, ppt.num_samples());
+    return 1 - Math.pow(.5, ppt.num_samples());
   }
 
   @Pure
@@ -359,5 +397,37 @@ public final class SeqFloatGreaterEqual extends SequenceFloat {
             // v1 > v2 => v1 >= v2
             new NISuppression(v1_gt_v2, suppressee),
         });
+        @Override
+  public @Nullable SeqFloatGreaterEqual merge(
+      List<Invariant> invs,
+      PptSlice parent_ppt) {
+    if (invs.isEmpty()) {
+    return null;
+  }
 
+    SeqFloatGreaterEqual result = new SeqFloatGreaterEqual(parent_ppt);
+
+    double mergedElementsMin = Double.MAX_VALUE;
+    double mergedXMax = Double.NEGATIVE_INFINITY;
+
+    for (Invariant inv : invs) {
+
+      if (!(inv instanceof SeqFloatGreaterEqual)) {
+        return null;
+      }
+
+      SeqFloatGreaterEqual other = (SeqFloatGreaterEqual) inv;
+
+      mergedElementsMin =
+          Math.min(mergedElementsMin, other.aElementsMinValue);
+
+      mergedXMax =
+          Math.max(mergedXMax, other.xMaxValue);
+    }
+
+    result.aElementsMinValue = mergedElementsMin;
+    result.xMaxValue = mergedXMax;
+
+    return result;
+  }
 }

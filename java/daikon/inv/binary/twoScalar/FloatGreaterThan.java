@@ -19,11 +19,15 @@ import org.checkerframework.checker.interning.qual.Interned;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
+import org.checkerframework.framework.qual.Unused;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
 import org.plumelib.util.Intern;
 import typequals.prototype.qual.NonPrototype;
 import typequals.prototype.qual.Prototype;
+
+import static daikon.Daikon.use_agora_pp;
+import static daikon.agora.PostmanUtils.getPostmanVariableName;
 
 /**
  * Represents an invariant of &gt; between two double scalars. Prints as {@code x > y}.
@@ -38,6 +42,13 @@ public final class FloatGreaterThan extends TwoFloat {
   public static boolean dkconfig_enabled = Invariant.invariantEnabledDefault;
 
   public static final Logger debug = Logger.getLogger("daikon.inv.binary.twoScalar.FloatGreaterThan");
+  
+  // If AGORA++ is applied, do not report the invariant if the minimum value of v1 is greater than the maximum value of v2
+  @Unused(when=Prototype.class)
+  private Double v1MinValue = Double.MAX_VALUE;
+
+  @Unused(when=Prototype.class)
+  private Double v2MaxValue = Double.MIN_VALUE;
 
   FloatGreaterThan(PptSlice ppt) {
     super(ppt);
@@ -154,12 +165,27 @@ public final class FloatGreaterThan extends TwoFloat {
           + var2().simplifyFixup(var2name)
           + ")";
     }
-
+    
+    if (format == OutputFormat.POSTMAN) {
+      return "pm.expect(" + getPostmanVariableName(var1().name()) + ").to.be.greaterThan(" + getPostmanVariableName(var2().name()) + ")";
+    }
+    if (format == OutputFormat.DSL) {
+      return "gt(" + var1name + ", " + var2name + ")";
+    }
     return format_unimplemented(format);
   }
 
   @Override
   public InvariantStatus check_modified(double v1, double v2, int count) {
+    // Update minimum value of v1
+    if(v1 < v1MinValue){
+      v1MinValue = v1;
+    }
+
+    // Update maximum value of v2
+    if(v2 > v2MaxValue) {
+      v2MaxValue = v2;
+    }
     if (!Global.fuzzy.gt(v1, v2)) {
       return InvariantStatus.FALSIFIED;
     }
@@ -194,7 +220,13 @@ public final class FloatGreaterThan extends TwoFloat {
       // // possible (pegA, pegB) pairs.
       // return 1 - (Math.pow(.5, ppt.num_values())
       //             * Math.pow(.99, ppt.num_mod_samples()));
-      return 1 - Math.pow(.5, ppt.num_samples());
+    // If AGORA++ is applied, do not report the invariant if the minimum value of v1 is greater than the maximum value of v2
+    if(use_agora_pp) {
+      if(v1MinValue > v2MaxValue) {
+        return Invariant.CONFIDENCE_UNJUSTIFIED;
+      }
+    }
+    return 1 - Math.pow(.5, ppt.num_samples());
   }
 
   @Pure
@@ -433,5 +465,31 @@ public final class FloatGreaterThan extends TwoFloat {
   public @Nullable NISuppressionSet get_ni_suppressions() {
     return null;
   }
+  @Override
+  public @Nullable Invariant merge(
+      List<@NonNull Invariant> invs,
+      PptSlice parent_ppt) {
 
+    FloatGreaterThan result =
+        (FloatGreaterThan) super.merge(invs, parent_ppt);
+
+    if (result == null) {
+      return null;
+    }
+
+    result.v1MinValue = Double.MAX_VALUE;
+    result.v2MaxValue = Double.MIN_VALUE;
+
+    for (Invariant inv : invs) {
+      FloatGreaterThan other = (FloatGreaterThan) inv;
+
+      result.v1MinValue =
+          Math.min(result.v1MinValue, other.v1MinValue);
+
+      result.v2MaxValue =
+          Math.max(result.v2MaxValue, other.v2MaxValue);
+    }
+
+    return result;
+  }
 }

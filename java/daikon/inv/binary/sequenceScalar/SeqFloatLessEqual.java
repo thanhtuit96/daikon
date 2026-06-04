@@ -15,9 +15,14 @@ import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
+import org.checkerframework.framework.qual.Unused;
+import org.checkerframework.checker.nullness.qual.NonNull;
 import org.plumelib.util.Intern;
 import typequals.prototype.qual.NonPrototype;
 import typequals.prototype.qual.Prototype;
+
+import static daikon.Daikon.use_agora_pp;
+import static daikon.agora.PostmanUtils.getPostmanVariableName;
 
 /**
  * Represents an invariant between a double scalar and a a sequence of double values. Prints
@@ -34,6 +39,13 @@ public final class SeqFloatLessEqual extends SequenceFloat {
 
   public static final Logger debug =
     Logger.getLogger("daikon.inv.binary.sequenceScalar.SeqFloatLessEqual");
+// If AGORA++ is applied, do not report the invariant if the maximum value of the elements of a
+  // is less than the minimum value of x
+  @Unused(when=Prototype.class)
+  private Double aElementsMaxValue = Double.MIN_VALUE;
+
+  @Unused(when= Prototype.class)
+  private Double xMinValue = Double.MAX_VALUE;
 
   static boolean debugSeqIntComparison = false;
 
@@ -149,10 +161,24 @@ public final class SeqFloatLessEqual extends SequenceFloat {
     if (format == OutputFormat.CSHARPCONTRACT) {
       return format_csharp_contract();
     }
-
+    if (format == OutputFormat.POSTMAN) {
+      return format_postman();
+    }
+    if (format == OutputFormat.DSL) {
+      return format_dsl();
+    }
     return format_unimplemented(format);
   }
+  
+  public String format_postman(@GuardSatisfied SeqFloatLessEqual this) {
+    return "pm.expect(" + getPostmanVariableName(seqvar().name()) + ".every(element => element <= "
+        + getPostmanVariableName(sclvar().name()) + ")).to.be.true";
+  }
 
+  public String format_dsl(@GuardSatisfied SeqFloatLessEqual this) {
+    return seqvar().name() + "->forAll(e | e <= " + sclvar().name() + ")";
+  }
+  
   public String format_daikon(@GuardSatisfied SeqFloatLessEqual this) {
     return seqvar().name() + " elements <= " + sclvar().name();
   }
@@ -191,7 +217,17 @@ public final class SeqFloatLessEqual extends SequenceFloat {
     /*if (logDetail() || debug.isLoggable(Level.FINE))
       log(debug,"(<= " + Arrays.toString(a)
       + " " + x);*/
+    // Update the minimum value of x
+    if(x < xMinValue) {
+      xMinValue = x;
+    }
+
     for (int i = 0; i < a.length; i++) {
+
+      // Update the maximum value of the elements of a
+      if(a[i] > aElementsMaxValue) {
+        aElementsMaxValue = a[i];
+      }
 
         // assert seqvar().type.elementIsIntegral();
 
@@ -220,9 +256,15 @@ public final class SeqFloatLessEqual extends SequenceFloat {
     if (vs.elem_cnt() == 0) {
       return CONFIDENCE_UNJUSTIFIED;
     }
-
+// If AGORA++ is applied, do not report the invariant if the maximum value of the elements of a
+    // is less than the minimum value of x
+    if(use_agora_pp) {
+      if(aElementsMaxValue < xMinValue) {
+        return Invariant.CONFIDENCE_UNJUSTIFIED;
+      }
+    }
       // return 1 - Math.pow(.5, vs.elem_cnt());
-      return 1 - Math.pow(.5, ppt.num_samples());
+    return 1 - Math.pow(.5, ppt.num_samples());
   }
 
   @Pure
@@ -359,5 +401,25 @@ public final class SeqFloatLessEqual extends SequenceFloat {
             // v1 < v2 => v1 <= v2
             new NISuppression(v1_lt_v2, suppressee),
         });
+        @Override
+  public @Nullable SeqFloatLessEqual merge(
+      List<Invariant> invs,
+      PptSlice parent_ppt) {
 
+    SeqFloatLessEqual result = new SeqFloatLessEqual(parent_ppt);
+
+    for (Invariant inv : invs) {
+      SeqFloatLessEqual other = (SeqFloatLessEqual) inv;
+
+      result.aElementsMaxValue =
+          Math.max(result.aElementsMaxValue,
+                  other.aElementsMaxValue);
+
+      result.xMinValue =
+          Math.min(result.xMinValue,
+                  other.xMinValue);
+    }
+
+    return result;
+  }
 }

@@ -10,18 +10,23 @@ import daikon.inv.binary.twoScalar.*;
 import daikon.suppress.*;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.checkerframework.checker.interning.qual.Interned;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
+import org.checkerframework.framework.qual.Unused;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
 import org.plumelib.util.ArraysPlume;
 import org.plumelib.util.Intern;
 import typequals.prototype.qual.NonPrototype;
 import typequals.prototype.qual.Prototype;
+
+import static daikon.Daikon.use_agora_pp;
+import static daikon.agora.PostmanUtils.getPostmanVariableName;
 
 /**
  * Represents an invariant between corresponding elements of two sequences of double values. The
@@ -35,6 +40,13 @@ public class PairwiseFloatLessEqual extends TwoSequenceFloat {
   /** Debug tracer. */
   public static final Logger debug =
     Logger.getLogger("daikon.inv.binary.twoSequence.PairwiseFloatLessEqual");
+  // If AGORA++ is applied, do not report the invariant if the maximum value of the elements of a1 is less than
+  // the minimum value of the elements of a2
+  @Unused(when=Prototype.class)
+  private Double a1ElementsMaxValue = Double.MIN_VALUE;
+
+  @Unused(when=Prototype.class)
+  private Double a2ElementsMinValue = Double.MAX_VALUE;
 
   // Variables starting with dkconfig_ should only be set via the
   // daikon.config.Configuration interface.
@@ -219,10 +231,23 @@ public class PairwiseFloatLessEqual extends TwoSequenceFloat {
     if (format == OutputFormat.CSHARPCONTRACT) {
       return format_csharp();
     }
-
+    
+    if (format == OutputFormat.POSTMAN) {
+      return format_postman();
+    }
+    if (format == OutputFormat.DSL) {
+      return format_dsl();
+    }
     return format_unimplemented(format);
   }
-
+  
+  public String format_postman(@GuardSatisfied PairwiseFloatLessEqual this) {
+    return "pm.expect(" + getPostmanVariableName(var1().name()) + ".every((element, index) => element <= "
+        + getPostmanVariableName(var2().name()) + "[index])).to.be.true";
+  }
+  public String format_dsl(@GuardSatisfied PairwiseFloatLessEqual this) {
+    return "pairwiseLTE(" + var1().name() + ", " + var2().name() + ")";
+  }
   public String format_daikon(@GuardSatisfied PairwiseFloatLessEqual this) {
     return var1().name() + " <= " + var2().name() + " (elementwise)";
   }
@@ -271,6 +296,17 @@ public class PairwiseFloatLessEqual extends TwoSequenceFloat {
     for (int i = 0; i < len; i++) {
       double v1 = a1[i];
       double v2 = a2[i];
+      
+      // Update the maximum value of the elements of a1
+      if(v1 > a1ElementsMaxValue) {
+        a1ElementsMaxValue = v1;
+      }
+
+      // Update the minimum value of the elements of a2
+      if(v2 < a2ElementsMinValue) {
+        a2ElementsMinValue = v2;
+      }
+
       if (!Global.fuzzy.lte(v1, v2) ) {
         //  destroyAndFlow();
         return InvariantStatus.FALSIFIED;
@@ -297,7 +333,13 @@ public class PairwiseFloatLessEqual extends TwoSequenceFloat {
     if (num_values == 0) {
       return Invariant.CONFIDENCE_UNJUSTIFIED;
     } else {
-
+      // If AGORA++ is applied, do not report the invariant if the maximum value of the elements of a1 is less than
+      // the minimum value of the elements of a2
+      if(use_agora_pp) {
+        if(a1ElementsMaxValue < a2ElementsMinValue) {
+          return Invariant.CONFIDENCE_UNJUSTIFIED;
+        }
+      }
       return 1 - Math.pow(.5, num_values);
     }
   }
@@ -350,5 +392,29 @@ public class PairwiseFloatLessEqual extends TwoSequenceFloat {
           new NISuppression(v1_lt_v2, suppressee),
 
         });
+  @Override
+  public Invariant merge(List<Invariant> invs, PptSlice parent_ppt) {
 
-}
+    PairwiseFloatLessEqual result =
+        (PairwiseFloatLessEqual) super.merge(invs, parent_ppt);
+
+    if (result == null) {
+      return null;
+    }
+
+    result.a1ElementsMaxValue = Double.MIN_VALUE;
+    result.a2ElementsMinValue = Double.MAX_VALUE;
+
+    for (Invariant inv : invs) {
+      PairwiseFloatLessEqual pfle = (PairwiseFloatLessEqual) inv;
+
+      result.a1ElementsMaxValue =
+          Math.max(result.a1ElementsMaxValue, pfle.a1ElementsMaxValue);
+
+      result.a2ElementsMinValue =
+          Math.min(result.a2ElementsMinValue, pfle.a2ElementsMinValue);
+    }
+
+    return result;
+  }
+  }

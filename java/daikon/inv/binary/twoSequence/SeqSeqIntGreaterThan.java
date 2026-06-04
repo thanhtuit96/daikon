@@ -14,6 +14,7 @@ import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
+import org.checkerframework.framework.qual.Unused;
 import org.plumelib.util.ArraysPlume;
 import org.plumelib.util.Intern;
 import typequals.prototype.qual.NonPrototype;
@@ -43,6 +44,13 @@ public class SeqSeqIntGreaterThan extends TwoSequence
 
   /** Debugging logger. */
   static final Logger debug = Logger.getLogger("daikon.inv.binary.twoSequence.SeqSeqIntGreaterThan");
+  // If AGORA++ is applied, do not report the invariant if the minimum value of the elements of v1 is greater than
+  // the maximum value of the elements of v2
+  @Unused(when = Prototype.class)
+  private Long v1ElementsMinValue = Long.MAX_VALUE;
+
+  @Unused(when = Prototype.class)
+  private Long v2ElementsMaxValue = Long.MIN_VALUE;
 
   static Comparator<long[]> comparator = ArraysPlume.LongArrayComparatorLexical.it;
 
@@ -82,25 +90,24 @@ public class SeqSeqIntGreaterThan extends TwoSequence
       return false;
     }
 
-      VarInfo var1 = vis[0];
-      VarInfo var2 = vis[1];
-      ProglangType type1 = var1.type;
-      ProglangType type2 = var2.type;
+    VarInfo var1 = vis[0];
+    VarInfo var2 = vis[1];
+    ProglangType type1 = var1.type;
+    ProglangType type2 = var2.type;
 
-      // This intentonally checks dimensions(), not pseudoDimensions.
-      boolean only_eq =
-        !((type1.dimensions() == 1)
-          && type1.baseIsIntegral()
-          && (type2.dimensions() == 1)
-          && type2.baseIsIntegral());
-      if (only_eq) {
-        return false;
-      }
+    // This intentonally checks dimensions(), not pseudoDimensions.
+    boolean only_eq = !((type1.dimensions() == 1)
+        && type1.baseIsIntegral()
+        && (type2.dimensions() == 1)
+        && type2.baseIsIntegral());
+    if (only_eq) {
+      return false;
+    }
 
-      // non equality comparisons don't make sense if the arrays aren't ordered
-      if (!var1.aux.hasOrder() || !var2.aux.hasOrder()) {
-        return false;
-      }
+    // non equality comparisons don't make sense if the arrays aren't ordered
+    if (!var1.aux.hasOrder() || !var2.aux.hasOrder()) {
+      return false;
+    }
 
     return true;
   }
@@ -120,8 +127,7 @@ public class SeqSeqIntGreaterThan extends TwoSequence
   @Override
   public String repr(@GuardSatisfied SeqSeqIntGreaterThan this) {
     return "SeqSeqIntGreaterThan" + varNames() + ": ,orderMatters=" + orderMatters
-      + ",enoughSamples=" + enoughSamples()
-      ;
+        + ",enoughSamples=" + enoughSamples();
   }
 
   @SideEffectFree
@@ -159,15 +165,15 @@ public class SeqSeqIntGreaterThan extends TwoSequence
       String name2 = var2().name_using(format);
 
       return "daikon.Quant."
-        + (var1().aux.hasOrder() ? "lexGT" : "setEqual" )
-        + "("
-        + name1
-        + ", "
-        + name2
-        + ")";
+          + (var1().aux.hasOrder() ? "lexGT" : "setEqual")
+          + "("
+          + name1
+          + ", "
+          + name2
+          + ")";
 
     }
-    
+
     if (format == OutputFormat.POSTMAN) {
       return "pm.expect(" + getPostmanVariableName(var1().name()) + ".every((element, index) => element > "
           + getPostmanVariableName(var2().name()) + "[index])).to.be.true";
@@ -191,18 +197,18 @@ public class SeqSeqIntGreaterThan extends TwoSequence
     String[] var2_name = var2().simplifyNameAndBounds();
     if (var1_name == null || var2_name == null) {
       return String.format("%s.format_simplify_defined(%s): var1_name=%s, var2_name=%s, for %s",
-                           getClass().getSimpleName(), this,
-                           Arrays.toString(var1_name), Arrays.toString(var2_name), format());
+          getClass().getSimpleName(), this,
+          Arrays.toString(var1_name), Arrays.toString(var2_name), format());
     }
     return "(|lexical->| "
-      + var1_name[0] + " " + var1_name[1] + " " + var1_name[2] + " "
-      + var2_name[0] + " " + var2_name[1] + " " + var2_name[2] + ")";
+        + var1_name[0] + " " + var1_name[1] + " " + var1_name[2] + " "
+        + var2_name[0] + " " + var2_name[1] + " " + var2_name[2] + ")";
   }
 
   private String format_simplify_explicit(@GuardSatisfied SeqSeqIntGreaterThan this) {
 
-      String classname = this.getClass().toString().substring(6);
-      return "warning: method " + classname
+    String classname = this.getClass().toString().substring(6);
+    return "warning: method " + classname
         + ".format_simplify_explicit() needs to be implemented: " + format();
 
   }
@@ -217,16 +223,28 @@ public class SeqSeqIntGreaterThan extends TwoSequence
     //   return;
     // }
 
+    // Update minimum value of v1 elements
+    Long currentV1MinValue = Arrays.stream(v1).min().orElse(Long.MAX_VALUE);
+    if (currentV1MinValue < v1ElementsMinValue) {
+      v1ElementsMinValue = currentV1MinValue;
+    }
+
+    // Update maximum value of v2 elements
+    Long currentV2MaxValue = Arrays.stream(v2).max().orElse(Long.MIN_VALUE);
+    if (currentV2MaxValue > v2ElementsMaxValue) {
+      v2ElementsMaxValue = currentV2MaxValue;
+    }
+
     int comparison = 0;
     if (orderMatters) {
       // Standard element wise comparison
-       comparison = comparator.compare(v1, v2);
+      comparison = comparator.compare(v1, v2);
     } else {
       // Do a double subset comparison
-      comparison = (ArraysPlume.isSubset(v1, v2) && ArraysPlume.isSubset( v2, v1)) ? 0 : -1;
+      comparison = (ArraysPlume.isSubset(v1, v2) && ArraysPlume.isSubset(v2, v1)) ? 0 : -1;
     }
 
-    if (!(comparison > 0) ) {
+    if (!(comparison > 0)) {
       return InvariantStatus.FALSIFIED;
     }
     return InvariantStatus.NO_CHANGE;
@@ -237,12 +255,18 @@ public class SeqSeqIntGreaterThan extends TwoSequence
     if (logDetail()) {
       log("add_modified (%s, %s)", Arrays.toString(v1), Arrays.toString(v2));
     }
-        return check_modified(v1, v2, count);
+    return check_modified(v1, v2, count);
   }
 
   @Override
   protected double computeConfidence() {
-
+    // If AGORA++ is applied, do not report the invariant if the minimum value of the elements of v1 is greater than
+    // the maximum value of the elements of v2
+    if (use_agora_pp) {
+      if (v1ElementsMinValue > v2ElementsMaxValue) {
+        return Invariant.CONFIDENCE_UNJUSTIFIED;
+      }
+    }
     return 1 - Math.pow(.5, ppt.num_values());
   }
 
@@ -293,16 +317,16 @@ public class SeqSeqIntGreaterThan extends TwoSequence
   @Override
   public @Nullable DiscardInfo isObviousStatically(VarInfo[] vis) {
 
-      VarInfo var1 = vis[0];
-      VarInfo var2 = vis[1];
-      DiscardInfo di;
-      di = SubSequence.isObviousSubSequence(this, var1, var2);
-      if (di == null) {
-        di = SubSequence.isObviousSubSequence(this, var2, var1);
-      }
-      if (di != null) {
-        return di;
-      }
+    VarInfo var1 = vis[0];
+    VarInfo var2 = vis[1];
+    DiscardInfo di;
+    di = SubSequence.isObviousSubSequence(this, var1, var2);
+    if (di == null) {
+      di = SubSequence.isObviousSubSequence(this, var2, var1);
+    }
+    if (di != null) {
+      return di;
+    }
 
     return super.isObviousStatically(vis);
   }
@@ -316,126 +340,126 @@ public class SeqSeqIntGreaterThan extends TwoSequence
     }
     assert ppt != null;
 
-      Debug debug = new Debug(getClass(), ppt, vis);
+    Debug debug = new Debug(getClass(), ppt, vis);
 
-      if (logOn()) {
-        debug.log("Checking IsObviousDynamically");
-      }
+    if (logOn()) {
+      debug.log("Checking IsObviousDynamically");
+    }
 
-      // Check to see if the same Pairwise invariant exists
-      DiscardInfo di = new DiscardInfo(this, DiscardCode.obvious, "");
-      if (ppt.parent.check_implied(di, vis[0], vis[1], PairwiseIntGreaterThan.get_proto())) {
-        di.add_implied_vis(vis);
-        return di;
-      }
+    // Check to see if the same Pairwise invariant exists
+    DiscardInfo di = new DiscardInfo(this, DiscardCode.obvious, "");
+    if (ppt.parent.check_implied(di, vis[0], vis[1], PairwiseIntGreaterThan.get_proto())) {
+      di.add_implied_vis(vis);
+      return di;
+    }
 
-      // If either variable is a subsequence and the original arrays
-      // are related elementwise this isn't interesting
-      VarInfo v1 = vis[0];
-      VarInfo v2 = vis[1];
-      VarInfo arr1 = v1;
-      VarInfo arr2 = v2;
-      if (v1.derived instanceof SequenceScalarSubsequence) {
-        arr1 = ((SequenceScalarSubsequence) v1.derived).seqvar();
-      }
-      if (v2.derived instanceof SequenceScalarSubsequence) {
-        arr2 = ((SequenceScalarSubsequence) v2.derived).seqvar();
-      }
-      if (!isEqual() && ((arr1 != v1) || (arr2 != v2))) {
-        VarInfo[] avis = new VarInfo [] {arr1, arr2};
-        PptSlice slice = this.ppt.parent.findSlice_unordered(avis);
-        if (slice != null) {
-          PairwiseIntEqual picEQ = PairwiseIntEqual.find(slice);
-          if (picEQ != null) {
-            return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + picEQ.format());
-          }
-          PairwiseIntLessThan picLT = PairwiseIntLessThan.find(slice);
-          if (picLT != null) {
-            return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + picLT.format());
-          }
-          PairwiseIntGreaterThan picGT = PairwiseIntGreaterThan.find(slice);
-          if (picGT != null) {
-            return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + picGT.format());
-          }
-          PairwiseIntLessEqual picLE = PairwiseIntLessEqual.find(slice);
-          if (picLE != null) {
-            return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + picLE.format());
-          }
-          PairwiseIntGreaterEqual picGE = PairwiseIntGreaterEqual.find(slice);
-          if (picGE != null) {
-            return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + picGE.format());
-          }
+    // If either variable is a subsequence and the original arrays
+    // are related elementwise this isn't interesting
+    VarInfo v1 = vis[0];
+    VarInfo v2 = vis[1];
+    VarInfo arr1 = v1;
+    VarInfo arr2 = v2;
+    if (v1.derived instanceof SequenceScalarSubsequence) {
+      arr1 = ((SequenceScalarSubsequence) v1.derived).seqvar();
+    }
+    if (v2.derived instanceof SequenceScalarSubsequence) {
+      arr2 = ((SequenceScalarSubsequence) v2.derived).seqvar();
+    }
+    if (!isEqual() && ((arr1 != v1) || (arr2 != v2))) {
+      VarInfo[] avis = new VarInfo[] { arr1, arr2 };
+      PptSlice slice = this.ppt.parent.findSlice_unordered(avis);
+      if (slice != null) {
+        PairwiseIntEqual picEQ = PairwiseIntEqual.find(slice);
+        if (picEQ != null) {
+          return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + picEQ.format());
+        }
+        PairwiseIntLessThan picLT = PairwiseIntLessThan.find(slice);
+        if (picLT != null) {
+          return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + picLT.format());
+        }
+        PairwiseIntGreaterThan picGT = PairwiseIntGreaterThan.find(slice);
+        if (picGT != null) {
+          return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + picGT.format());
+        }
+        PairwiseIntLessEqual picLE = PairwiseIntLessEqual.find(slice);
+        if (picLE != null) {
+          return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + picLE.format());
+        }
+        PairwiseIntGreaterEqual picGE = PairwiseIntGreaterEqual.find(slice);
+        if (picGE != null) {
+          return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + picGE.format());
         }
       }
+    }
 
-      // Similarly, if either variable is a subsequence and the original
-      // arrays are related lexically this isn't interesting
-      if ((arr1 != v1) || (arr2 != v2)) {
-        if (arr1 == arr2) {
-          debug.log("Obvious Dynamic- subsequence from same array");
-          return new DiscardInfo(this, DiscardCode.obvious, "Supersequences are related lexically");
-        }
-        VarInfo[] avis = {arr1, arr2};
-        debug.log("looking for " + avis[0].name() + " " + avis[1].name());
-        PptSlice slice = this.ppt.parent.findSlice_unordered(avis);
-        debug.log("Found ppt " + slice);
-        if (slice != null) {
-          for (Invariant inv : slice.invs) {
-            debug.log("-- invariant " + inv.format());
-          }
-          Invariant inv;
-          inv = SeqSeqIntEqual.find(slice);
-          if (inv != null) {
-            if (logOn()) {
-              debug.log("Obvious Dynamic from " + inv.format() + "(" + inv.getClass() + ")");
-            }
-            return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + inv.format());
-          }
-          inv = SeqSeqIntLessThan.find(slice);
-          if (inv != null) {
-            if (logOn()) {
-              debug.log("Obvious Dynamic from " + inv.format() + "(" + inv.getClass() + ")");
-            }
-            return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + inv.format());
-          }
-          inv = SeqSeqIntGreaterThan.find(slice);
-          if (inv != null) {
-            if (logOn()) {
-              debug.log("Obvious Dynamic from " + inv.format() + "(" + inv.getClass() + ")");
-            }
-            return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + inv.format());
-          }
-          inv = SeqSeqIntLessEqual.find(slice);
-          if (inv != null) {
-            if (logOn()) {
-              debug.log("Obvious Dynamic from " + inv.format() + "(" + inv.getClass() + ")");
-            }
-            return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + inv.format());
-          }
-          inv = SeqSeqIntGreaterEqual.find(slice);
-          if (inv != null) {
-            if (logOn()) {
-              debug.log("Obvious Dynamic from " + inv.format() + "(" + inv.getClass() + ")");
-            }
-            return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + inv.format());
-          }
-        }
+    // Similarly, if either variable is a subsequence and the original
+    // arrays are related lexically this isn't interesting
+    if ((arr1 != v1) || (arr2 != v2)) {
+      if (arr1 == arr2) {
+        debug.log("Obvious Dynamic- subsequence from same array");
+        return new DiscardInfo(this, DiscardCode.obvious, "Supersequences are related lexically");
       }
-
-      // Check to see if these variables are obviously related
-      if (v1.isDerived() || v2.isDerived()) {
-        if (SubSequence.isObviousSubSequenceDynamically(this, v1, v2)
-          || SubSequence.isObviousSubSequenceDynamically(this, v2, v1)) {
+      VarInfo[] avis = { arr1, arr2 };
+      debug.log("looking for " + avis[0].name() + " " + avis[1].name());
+      PptSlice slice = this.ppt.parent.findSlice_unordered(avis);
+      debug.log("Found ppt " + slice);
+      if (slice != null) {
+        for (Invariant inv : slice.invs) {
+          debug.log("-- invariant " + inv.format());
+        }
+        Invariant inv;
+        inv = SeqSeqIntEqual.find(slice);
+        if (inv != null) {
           if (logOn()) {
-            debug.log("Obvious SubSequence Dynamically");
+            debug.log("Obvious Dynamic from " + inv.format() + "(" + inv.getClass() + ")");
           }
-          assert ppt != null;
-          return new DiscardInfo(
-              this,
-              DiscardCode.obvious,
-              "Both vars are derived and one is a subsequence of the other");
+          return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + inv.format());
+        }
+        inv = SeqSeqIntLessThan.find(slice);
+        if (inv != null) {
+          if (logOn()) {
+            debug.log("Obvious Dynamic from " + inv.format() + "(" + inv.getClass() + ")");
+          }
+          return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + inv.format());
+        }
+        inv = SeqSeqIntGreaterThan.find(slice);
+        if (inv != null) {
+          if (logOn()) {
+            debug.log("Obvious Dynamic from " + inv.format() + "(" + inv.getClass() + ")");
+          }
+          return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + inv.format());
+        }
+        inv = SeqSeqIntLessEqual.find(slice);
+        if (inv != null) {
+          if (logOn()) {
+            debug.log("Obvious Dynamic from " + inv.format() + "(" + inv.getClass() + ")");
+          }
+          return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + inv.format());
+        }
+        inv = SeqSeqIntGreaterEqual.find(slice);
+        if (inv != null) {
+          if (logOn()) {
+            debug.log("Obvious Dynamic from " + inv.format() + "(" + inv.getClass() + ")");
+          }
+          return new DiscardInfo(this, DiscardCode.obvious, "Implied by " + inv.format());
         }
       }
+    }
+
+    // Check to see if these variables are obviously related
+    if (v1.isDerived() || v2.isDerived()) {
+      if (SubSequence.isObviousSubSequenceDynamically(this, v1, v2)
+          || SubSequence.isObviousSubSequenceDynamically(this, v2, v1)) {
+        if (logOn()) {
+          debug.log("Obvious SubSequence Dynamically");
+        }
+        assert ppt != null;
+        return new DiscardInfo(
+            this,
+            DiscardCode.obvious,
+            "Both vars are derived and one is a subsequence of the other");
+      }
+    }
 
     return null;
   }
@@ -478,23 +502,47 @@ public class SeqSeqIntGreaterThan extends TwoSequence
     return suppressions;
   }
 
-    /** Definition of this invariant (the suppressee) */
-    private static NISuppressee suppressee = new NISuppressee(SeqSeqIntGreaterThan.class, 2);
+  /** Definition of this invariant (the suppressee) */
+  private static NISuppressee suppressee = new NISuppressee(SeqSeqIntGreaterThan.class, 2);
 
-    // Suppressor definitions (used in suppressions below)
-    private static NISuppressor v1_pw_v2 = new NISuppressor(0, 1, PairwiseIntGreaterThan.class);
+  // Suppressor definitions (used in suppressions below)
+  private static NISuppressor v1_pw_v2 = new NISuppressor(0, 1, PairwiseIntGreaterThan.class);
 
-    private static NISuppressionSet suppressions =
-      new NISuppressionSet(
-          new NISuppression[] {
-            // pairwise => lexical
-            new NISuppression(v1_pw_v2, suppressee),
-          });
+  private static NISuppressionSet suppressions = new NISuppressionSet(
+      new NISuppression[] {
+          // pairwise => lexical
+          new NISuppression(v1_pw_v2, suppressee),
+      });
 
+  // @Override
+  // public @Nullable @NonPrototype SeqSeqIntGreaterThan merge(
+  //     @Prototype SeqSeqIntGreaterThan this, List<@NonPrototype Invariant> invs, PptSlice parent_ppt) {
+  //   // Ignore the orderMatters field, because it is always the same (and is always true).
+  //   return (SeqSeqIntGreaterThan) super.merge(invs, parent_ppt);
+  // }
   @Override
   public @Nullable @NonPrototype SeqSeqIntGreaterThan merge(
-      @Prototype SeqSeqIntGreaterThan this, List<@NonPrototype Invariant> invs, PptSlice parent_ppt) {
-    // Ignore the orderMatters field, because it is always the same (and is always true).
-    return (SeqSeqIntGreaterThan) super.merge(invs, parent_ppt);
+      @Prototype SeqSeqIntGreaterThan this,
+      List<@NonPrototype Invariant> invs,
+      PptSlice parent_ppt) {
+
+    SeqSeqIntGreaterThan result =
+        (SeqSeqIntGreaterThan) super.merge(invs, parent_ppt);
+
+    if (result == null) {
+      return null;
+    }
+
+    for (Invariant inv : invs) {
+      SeqSeqIntGreaterThan s = (SeqSeqIntGreaterThan) inv;
+
+      result.v1ElementsMinValue =
+          Math.min(result.v1ElementsMinValue, s.v1ElementsMinValue);
+
+      result.v2ElementsMaxValue =
+          Math.max(result.v2ElementsMaxValue, s.v2ElementsMaxValue);
+    }
+
+    return result;
   }
 }

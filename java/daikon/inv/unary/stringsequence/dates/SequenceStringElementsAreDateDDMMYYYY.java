@@ -85,7 +85,7 @@ public class SequenceStringElementsAreDateDDMMYYYY extends SingleStringSequence 
   @Override
   public String format_using(@GuardSatisfied SequenceStringElementsAreDateDDMMYYYY this, OutputFormat format) {
     if (format == OutputFormat.DAIKON) {
-      return "All the elements of " + var().name() + " are dates. Format: DD/MM/YYYY";
+      return "All the elements of " + var().name() + " are dates. Format: DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY";
     }
 
     if (format == OutputFormat.POSTMAN) {

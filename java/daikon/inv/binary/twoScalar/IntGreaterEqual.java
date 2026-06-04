@@ -18,6 +18,7 @@ import java.util.logging.Logger;
 import org.checkerframework.checker.interning.qual.Interned;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.NonNull;
+import org.checkerframework.framework.qual.Unused;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
@@ -41,6 +42,13 @@ public final class IntGreaterEqual extends TwoScalar {
   public static boolean dkconfig_enabled = Invariant.invariantEnabledDefault;
 
   public static final Logger debug = Logger.getLogger("daikon.inv.binary.twoScalar.IntGreaterEqual");
+  
+  // If AGORA++ is applied, do not report the invariant if the minimum value of v1 is greater than the maximum value of v2
+  @Unused(when=Prototype.class)
+  private Long v1MinValue = Long.MAX_VALUE;
+
+  @Unused(when=Prototype.class)
+  private Long v2MaxValue = Long.MIN_VALUE;
 
   IntGreaterEqual(PptSlice ppt) {
     super(ppt);
@@ -176,6 +184,17 @@ public final class IntGreaterEqual extends TwoScalar {
 
   @Override
   public InvariantStatus check_modified(long v1, long v2, int count) {
+    
+    // Update minimum value of v1
+    if(v1 < v1MinValue){
+      v1MinValue = v1;
+    }
+
+    // Update maximum value of v2
+    if (v2 > v2MaxValue) {
+      v2MaxValue = v2;
+    }
+    
     if (!(v1 >= v2)) {
       return InvariantStatus.FALSIFIED;
     }
@@ -210,7 +229,14 @@ public final class IntGreaterEqual extends TwoScalar {
       // // possible (pegA, pegB) pairs.
       // return 1 - (Math.pow(.5, ppt.num_values())
       //             * Math.pow(.99, ppt.num_mod_samples()));
-      return 1 - Math.pow(.5, ppt.num_samples());
+          
+    // If AGORA++ is applied, do not report the invariant if the minimum value of v1 is greater than the maximum value of v2
+    if(use_agora_pp) {
+      if(v1MinValue > v2MaxValue) {
+        return Invariant.CONFIDENCE_UNJUSTIFIED;
+      }
+    }
+    return 1 - Math.pow(.5, ppt.num_samples());
   }
 
   @Pure
@@ -412,5 +438,29 @@ public final class IntGreaterEqual extends TwoScalar {
     }
     return suppressions;
   }
+  @Override
+  public Invariant merge(List<Invariant> invs, PptSlice parent_ppt) {
 
+    IntGreaterEqual result = (IntGreaterEqual) super.merge(invs, parent_ppt);
+    if (result == null) {
+      return null;
+    }
+
+    result.v1MinValue = Long.MAX_VALUE;
+    result.v2MaxValue = Long.MIN_VALUE;
+
+    for (Invariant inv : invs) {
+      IntGreaterEqual other = (IntGreaterEqual) inv;
+
+      if (other.v1MinValue < result.v1MinValue) {
+        result.v1MinValue = other.v1MinValue;
+      }
+
+      if (other.v2MaxValue > result.v2MaxValue) {
+        result.v2MaxValue = other.v2MaxValue;
+      }
+    }
+
+    return result;
+  }
 }

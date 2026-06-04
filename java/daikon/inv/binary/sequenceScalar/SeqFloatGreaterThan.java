@@ -13,11 +13,16 @@ import java.util.logging.Logger;
 import org.checkerframework.checker.interning.qual.Interned;
 import org.checkerframework.checker.lock.qual.GuardSatisfied;
 import org.checkerframework.checker.nullness.qual.Nullable;
+import org.checkerframework.framework.qual.Unused;
+import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.dataflow.qual.Pure;
 import org.checkerframework.dataflow.qual.SideEffectFree;
 import org.plumelib.util.Intern;
 import typequals.prototype.qual.NonPrototype;
 import typequals.prototype.qual.Prototype;
+
+import static daikon.Daikon.use_agora_pp;
+import static daikon.agora.PostmanUtils.getPostmanVariableName;
 
 /**
  * Represents an invariant between a double scalar and a a sequence of double values. Prints
@@ -34,7 +39,13 @@ public final class SeqFloatGreaterThan extends SequenceFloat {
 
   public static final Logger debug =
     Logger.getLogger("daikon.inv.binary.sequenceScalar.SeqFloatGreaterThan");
+  // If AGORA++ is applied, do not report the invariant if the minimum value of the elements of a
+  // is greater than the maximum value of x
+  @Unused(when= Prototype.class)
+  private Double aElementsMinValue = Double.MAX_VALUE;
 
+  @Unused(when= Prototype.class)
+  private Double xMaxValue = Double.MIN_VALUE;
   static boolean debugSeqIntComparison = false;
 
   SeqFloatGreaterThan(PptSlice ppt) {
@@ -149,10 +160,24 @@ public final class SeqFloatGreaterThan extends SequenceFloat {
     if (format == OutputFormat.CSHARPCONTRACT) {
       return format_csharp_contract();
     }
-
+    if (format == OutputFormat.POSTMAN) {
+      return format_postman();
+    }
+    if (format == OutputFormat.DSL) {
+      return format_dsl();
+    }
     return format_unimplemented(format);
   }
+  
+  public String format_postman(@GuardSatisfied SeqFloatGreaterThan this) {
+    return "pm.expect(" + getPostmanVariableName(seqvar().name()) + ".every(element => element > "
+        + getPostmanVariableName(sclvar().name()) + ")).to.be.true";
+  }
 
+  public String format_dsl(@GuardSatisfied SeqFloatGreaterThan this) {
+    return seqvar().name() + "->forAll(e | e > " + sclvar().name() + ")";
+  }
+  
   public String format_daikon(@GuardSatisfied SeqFloatGreaterThan this) {
     return seqvar().name() + " elements > " + sclvar().name();
   }
@@ -191,8 +216,16 @@ public final class SeqFloatGreaterThan extends SequenceFloat {
     /*if (logDetail() || debug.isLoggable(Level.FINE))
       log(debug,"(> " + Arrays.toString(a)
       + " " + x);*/
-    for (int i = 0; i < a.length; i++) {
+    // Update maximum value of x
+    if(x > xMaxValue) {
+      xMaxValue = x;
+    }
 
+    for (int i = 0; i < a.length; i++) {
+      // Update minimum value of elements of a
+      if(a[i] < aElementsMinValue) {
+        aElementsMinValue = a[i];
+      }
         // assert seqvar().type.elementIsIntegral();
 
       if (!Global.fuzzy.gt(a[i], x)) {
@@ -220,9 +253,16 @@ public final class SeqFloatGreaterThan extends SequenceFloat {
     if (vs.elem_cnt() == 0) {
       return CONFIDENCE_UNJUSTIFIED;
     }
+    // If AGORA++ is applied, do not report the invariant if the minimum value of the elements of a
+    // is greater than the maximum value of x
+    if(use_agora_pp) {
+      if (aElementsMinValue > xMaxValue) {
+        return Invariant.CONFIDENCE_UNJUSTIFIED;
+      }
+    }
 
       // return 1 - Math.pow(.5, vs.elem_cnt());
-      return 1 - Math.pow(.5, ppt.num_samples());
+    return 1 - Math.pow(.5, ppt.num_samples());
   }
 
   @Pure
@@ -359,5 +399,26 @@ public final class SeqFloatGreaterThan extends SequenceFloat {
 
   /** NI Suppressions for each type of comparison. */
   private static @Nullable NISuppressionSet suppressions = null;
+  
+  @Override
+  public @Nullable SeqFloatGreaterThan merge(
+      List<Invariant> invs,
+      PptSlice parent_ppt) {
 
+    SeqFloatGreaterThan result = new SeqFloatGreaterThan(parent_ppt);
+
+    for (Invariant inv : invs) {
+      SeqFloatGreaterThan other = (SeqFloatGreaterThan) inv;
+
+      result.aElementsMinValue =
+          Math.min(result.aElementsMinValue,
+                  other.aElementsMinValue);
+
+      result.xMaxValue =
+          Math.max(result.xMaxValue,
+                  other.xMaxValue);
+    }
+
+    return result;
+  }
 }
