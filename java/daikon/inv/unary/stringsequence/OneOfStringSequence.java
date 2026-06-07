@@ -274,7 +274,7 @@ public final class OneOfStringSequence extends SingleStringSequence implements O
     }
     specificValues.append("]");
 
-    return "oneOf(" + var().name() + ", " + specificValues + ")";
+    return "in(" + var().name() + ", " + specificValues + ")";
   }
   
   private static String getStringArrayAsString(String[] inputArray) {

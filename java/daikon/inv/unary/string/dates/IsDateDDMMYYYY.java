@@ -74,7 +74,7 @@ public class IsDateDDMMYYYY extends SingleString {
             return "pm.expect(" + getPostmanVariableName(var().name()) + ").to.match(/" + regex + "/)";
         }
         if (format == OutputFormat.DSL) {
-            return "isDate(" + var().name() + ", \"DD/MM/YYYY\")";
+            return "isDate(" + var().name() + ", [\"DD/MM/YYYY\",\"DD-MM-YYYY\",\"DD.MM.YYYY\"])";
         }
 
         return format_unimplemented(format);

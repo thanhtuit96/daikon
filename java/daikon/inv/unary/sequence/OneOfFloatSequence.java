@@ -251,7 +251,7 @@ public final class OneOfFloatSequence extends SingleFloatSequence implements One
     }
     specificValues.append("]");
 
-    return "isOneOf(" + var().name() + ", " + specificValues + ")";
+    return "in(" + var().name() + ", " + specificValues + ")";
   }
   public String format_daikon(@GuardSatisfied OneOfFloatSequence this) {
     String varname = var().name();

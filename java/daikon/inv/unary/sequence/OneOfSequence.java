@@ -278,7 +278,7 @@ public final class OneOfSequence extends SingleScalarSequence implements OneOf {
     }
   }
   public String format_dsl(@GuardSatisfied OneOfSequence this) {
-    return "isOneOf(" + var().name() + ", " + subarray_rep() + ")";
+    return "in(" + var().name() + ", " + subarray_rep() + ")";
   }
   public String format_postman(@GuardSatisfied OneOfSequence this) {
 

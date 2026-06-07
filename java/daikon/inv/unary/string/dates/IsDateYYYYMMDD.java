@@ -76,7 +76,7 @@ public class IsDateYYYYMMDD extends SingleString {
 
         
         if (format == OutputFormat.DSL) {
-            return "isDate(" + var().name() + ", \"YYYY/MM/DD\")";
+            return "isDate(" + var().name() + ", [\"YYYY/MM/DD\",\"YYYY-MM-DD\",\"YYYY.MM.DD\"])";
         }
         return format_unimplemented(format);
 

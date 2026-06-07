@@ -290,8 +290,7 @@ public final class OneOfScalar extends SingleScalar implements OneOf {
       for (int i = 0; i < num_elts; i++) {
         e.add(((Integer.MIN_VALUE <= elts[i] && elts[i] <= Integer.MAX_VALUE) ? String.valueOf(elts[i]) : (String.valueOf(elts[i]) + "L")));
       }
-      String exp = String.join(", ", e);
-      return "oneof(" + varname + ", " + exp + ")";
+      return "in(" + varname + ", " + Arrays.toString(elts) + ")";
     }
   }
   public String format_postman(@GuardSatisfied OneOfScalar this) {
